@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 import requests
 import time
 from math import radians, sin, cos, sqrt, atan2
+from playwright.sync_api import sync_playwright, TimeoutError
+
 
 app = fastapi.FastAPI()
 
@@ -18,6 +20,16 @@ app.add_middleware(
 last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
 EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+GRADE_TO_SCORE = {
+    "A+": 100.0,
+    "A": 92.0,
+    "B": 85.0,
+    "C": 75.0,
+    "D": 65.0,
+    "F": 50.0,
+}
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -63,6 +75,48 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
                 score += 1.0
     return score
 
+
+def get_safety_score(zipcode: str) -> float:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"]
+        )
+
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            )
+        )
+
+        page = context.new_page()
+        page.goto("https://crimegrade.org/", timeout=60000)
+
+        zip_input = page.get_by_placeholder("Zip code")
+        zip_input.click()
+        zip_input.type(zipcode, delay=120)
+
+        page.get_by_role("button", name="Explore").click()
+
+        page.wait_for_timeout(2000)
+
+        grade_el = (
+            page.locator("text=Overall Crime Grade™")
+            .locator("xpath=preceding-sibling::*[1]")
+        )
+
+        grade_el.wait_for(state="visible", timeout=20000)
+        grade = grade_el.inner_text().strip()
+
+        browser.close()
+        print(f"Grade: {grade}")
+        return GRADE_TO_SCORE.get(grade, 0.0)
+
+    
+if __name__ == '__main__':
+    get_safety_score("92691")
 
 @app.get("/api/emergency-services/{zip_code}")
 def get_emergency_services(zip_code: str):
