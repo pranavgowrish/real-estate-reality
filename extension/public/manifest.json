@@ -5,8 +5,12 @@
     "action": {
         "default_popup": "index.html"
     },
-    "permissions": [
-        "scripting"
+    "permissions": ["activeTab", "scripting"],
+    "content_scripts": [
+        {
+            "matches": ["https://www.zillow.com/*"],
+            "js": ["content-script.js"]
+        }
     ],
     
     "host_permissions": [
