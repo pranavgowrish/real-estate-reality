@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 import requests
 import time
 from math import radians, sin, cos, sqrt, atan2
+import pandas as pd
+import numpy as np
 
 app = fastapi.FastAPI()
 
@@ -34,21 +36,65 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 
-def get_wellness_score(data):
-    # data is gonna be the variable holding csv file US_AQI.csv
-    # ONLY EXTRACT CITIES IN CALIFORNIA - THEN SINCE THERE IS MULTIPLE DATES FOR EACH CITY, AVERAGE ALL 
-    # extract values per city and based on address given, see how far city listed in dataset is and if its less than 50, use that AQI value
-    # other approach: use geopy to get the distance between the address given and the city listed in the dataset
+def get_wellness_score(zip_code, csv_path='backend/ca_city_avg_aqi.csv'):
+    '''
+    data is gonna be the variable holding csv file backend/ca_city_avg_aqi.csv 
+    extract lat/long of address given and see how far that is from the address given and if its less than 50 miles, use that AQI value to score 
+    other approach: use geopy to get the distance between the address given and the city listed in the dataset
 
-    # 0-50: good  --> 30 pts
-    # 51-100: moderate --> 25 pts
-    # 101-150: unhealthy for sensitive groups --> 20 pts
-    # 151-200: unhealthy --> 5 pts
-    # 201-300: very unhealthy --> 0 pts
-    # 301-500: hazardous --> 0 pts
+    0 – 25	Pristine	30 pts	Best possible air (coastal/rural).
+    26 – 50	Good	25 pts	Safe, but has typical urban background levels.
+    51 – 100	Moderate	15 pts	Significant drop-off in "safety feel."
+    100+	Unhealthy	0 pts	Immediate safety concern.
 
-    # return the total points as a score out of 100 
+    return the total points
+    '''
+
+    # 1. Convert home zip to coordinates
+    home_lat, home_lon, error = convert_zipcode_to_latlon(zip_code)
     
+    if error:
+        return {"error": f"Could not locate zip code: {error}"}
+
+    # 2. Load the AQI dataset
+    df = pd.read_csv(csv_path)
+
+    # 3. Find the nearest city in the dataset
+    min_dist_km = float('inf')
+    nearest_data = None
+
+    for _, row in df.iterrows():
+        # Note: dataset uses 'lng', haversine expects lon
+        dist = haversine(home_lat, home_lon, row['lat'], row['lng'])
+        
+        if dist < min_dist_km:
+            min_dist_km = dist
+            nearest_data = row
+
+    # 4. Convert distance to miles for the threshold check
+    dist_miles = min_dist_km * 0.621371
+    aqi_value = nearest_data['avg_aqi']
+    
+    # 5. Determine data validity based on plan (x = 15 miles)
+    if dist_miles <= 15:
+        data_confidence = "High (Local)"
+    else:
+        data_confidence = "Moderate (Regional)"
+
+    # 6. Apply point scoring logic
+    # 0-50: 30 pts | 51-100: 25 pts | 101-150: 20 pts | 151-200: 5 pts | 201+: 0 pts
+    if aqi_value <= 50:
+        points = 30
+    elif aqi_value <= 100:
+        points = 25
+    elif aqi_value <= 150:
+        points = 20
+    elif aqi_value <= 200:
+        points = 5
+    else:
+        points = 0
+
+    return points
 
 
 def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
