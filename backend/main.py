@@ -46,6 +46,23 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 
+# def get_wellness_score(data):
+    # data is gonna be the variable holding csv file US_AQI.csv
+    # ONLY EXTRACT CITIES IN CALIFORNIA - THEN SINCE THERE IS MULTIPLE DATES FOR EACH CITY, AVERAGE ALL 
+    # extract values per city and based on address given, see how far city listed in dataset is and if its less than 50, use that AQI value
+    # other approach: use geopy to get the distance between the address given and the city listed in the dataset
+
+    # 0-50: good  --> 30 pts
+    # 51-100: moderate --> 25 pts
+    # 101-150: unhealthy for sensitive groups --> 20 pts
+    # 151-200: unhealthy --> 5 pts
+    # 201-300: very unhealthy --> 0 pts
+    # 301-500: hazardous --> 0 pts
+
+    # return the total points as a score out of 100 
+    
+
+
 def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
     score = 0.0
     for service in services:
@@ -118,8 +135,8 @@ def get_crime_score(zipcode: str) -> float:
 if __name__ == '__main__': # For testing onlyyyy
     get_crime_score("92691")
 
-@app.get("/api/emergency-services/{zip_code}")
-def get_emergency_services(zip_code: str):
+
+def convert_zipcode_to_latlon(zip_code: str):
     global last_nominatim_request
     headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
 
@@ -128,7 +145,6 @@ def get_emergency_services(zip_code: str):
     if elapsed < NOMINATIM_DELAY:
         time.sleep(NOMINATIM_DELAY - elapsed)
     
-    # Zip code to longitude and latitude conversion
     geo_res = requests.get(
         f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
         headers=headers
@@ -138,13 +154,20 @@ def get_emergency_services(zip_code: str):
     try:
         geo_data = geo_res.json()
     except Exception as e:
-        return {"services": [], "error": f"Nominatim returned invalid JSON: {e}", "emergency_score": -1}
+        return None, None, f"Nominatim returned invalid JSON: {e}"
 
     if not geo_data:
-        return {"services": [], "error": "ZIP code not found", "emergency_score": -1}
+        return None, None, "ZIP code not found"
 
     lat = float(geo_data[0]["lat"])
     lon = float(geo_data[0]["lon"])
+    return lat, lon, None
+
+
+@app.get("/api/emergency-services/{zip_code}")
+def get_emergency_services(zip_code: str):
+    # Zip code to longitude and latitude conversion
+    lat, lon, error = convert_zipcode_to_latlon(zip_code)
 
     # Overpass query with 'out center' to get coordinates for ways
     overpass_query = f"""
