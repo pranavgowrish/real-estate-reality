@@ -76,7 +76,7 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
     return score
 
 
-def get_safety_score(zipcode: str) -> float:
+def get_crime_score(zipcode: str) -> float:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -115,8 +115,8 @@ def get_safety_score(zipcode: str) -> float:
         return GRADE_TO_SCORE.get(grade, 0.0)
 
     
-if __name__ == '__main__':
-    get_safety_score("92691")
+if __name__ == '__main__': # For testing onlyyyy
+    get_crime_score("92691")
 
 @app.get("/api/emergency-services/{zip_code}")
 def get_emergency_services(zip_code: str):
