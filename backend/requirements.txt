@@ -1,1 +1,6 @@
 fastapi
+uvicorn
+geopy
+requests
+pandas 
+numpy
