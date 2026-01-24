@@ -1,0 +1,137 @@
+import fastapi
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import requests
+import time
+from math import radians, sin, cos, sqrt, atan2
+
+app = fastapi.FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+last_nominatim_request = 0
+NOMINATIM_DELAY = 1.0
+EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+def haversine(lat1, lon1, lat2, lon2):
+
+    R = 6371.0  # ts is earth radius in km NOT miles
+
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+
+    a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    distance = R * c
+    return distance
+
+
+def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
+    score = 0.0
+    for service in services:
+        if service["type"] == "hospital":
+            distance = haversine(ogLat, ogLon, service["lat"], service["lon"])
+            if distance <= 10:
+                score += 10.0
+            elif distance <= 18:
+                score += 5.0
+            else:
+                score += 2.0
+        elif service["type"] == "police":
+            distance = haversine(ogLat, ogLon, service["lat"], service["lon"])
+            if distance <= 10:
+                score += 9.0
+            elif distance <= 18:
+                score += 4.5
+            else:
+                score += 1.5
+        elif service["type"] == "fire_station":
+            distance = haversine(ogLat, ogLon, service["lat"], service["lon"])
+            if distance <= 10:
+                score += 8.0
+            elif distance <= 18:
+                score += 4.0
+            else:
+                score += 1.0
+    return score
+
+
+@app.get("/api/emergency-services/{zip_code}")
+def get_emergency_services(zip_code: str):
+    global last_nominatim_request
+    headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
+
+    # Rate limit Nominatim requests
+    elapsed = time.time() - last_nominatim_request
+    if elapsed < NOMINATIM_DELAY:
+        time.sleep(NOMINATIM_DELAY - elapsed)
+    
+    # Zip code to longitude and latitude conversion
+    geo_res = requests.get(
+        f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
+        headers=headers
+    )
+    last_nominatim_request = time.time()
+    
+    try:
+        geo_data = geo_res.json()
+    except Exception as e:
+        return {"services": [], "error": f"Nominatim returned invalid JSON: {e}", "emergency_score": -1}
+
+    if not geo_data:
+        return {"services": [], "error": "ZIP code not found", "emergency_score": -1}
+
+    lat = float(geo_data[0]["lat"])
+    lon = float(geo_data[0]["lon"])
+
+    # Overpass query with 'out center' to get coordinates for ways
+    overpass_query = f"""
+    [out:json][timeout:25];
+    (
+      node["amenity"="hospital"](around:10000,{lat},{lon});
+      way["amenity"="hospital"](around:10000,{lat},{lon});
+      node["amenity"="police"](around:5000,{lat},{lon});
+      way["amenity"="police"](around:5000,{lat},{lon});
+      node["amenity"="fire_station"](around:5000,{lat},{lon});
+      way["amenity"="fire_station"](around:5000,{lat},{lon});
+    );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        return {"services": [], "error": f"Overpass API error: {e}", "emergency_score": -1}
+
+    services = []
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            services.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("amenity", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+    
+    score = get_emergency_score(services, lat, lon)
+    
+    return JSONResponse(content={
+        "services": services,
+        "emergency_score": score
+    })
