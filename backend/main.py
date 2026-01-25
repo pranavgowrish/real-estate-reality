@@ -246,7 +246,7 @@ async def get_crime_score(zipcode: str) -> float:
         print(f"BUWEHFIHWEFHIUOWEFHEWIOUHFOWEIWEHF{zipcode}")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=False,
+                headless=True,
                 args=["--disable-blink-features=AutomationControlled"]
             )
             print(f"BROWSER LAUNCHED FOR {zipcode}")
