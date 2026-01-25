@@ -98,21 +98,97 @@ function getInvestmentScore(roi_list, safety_list, convenience_list) {
 }
 
 // --- LOADER UI ---
-function updateLoader(msg, percent) {
-    let loader = document.getElementById('zillow-loader');
-    if (!loader) {
-        const container = document.getElementById('search-page-list-container');
-        if(!container) return;
-        container.style.position = 'relative';
-        loader = document.createElement('div');
-        loader.id = 'zillow-loader';
-        loader.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; color: #374151;`;
-        loader.innerHTML = `<div style="width: 150px; height: 6px; background: #e5e7eb; border-radius: 99px;"><div id="loader-bar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.3s; border-radius: 99px;"></div></div><div id="loader-text" style="font-size: 13px; margin-top: 10px;">Starting...</div>`;
-        container.appendChild(loader);
-    }
-    document.getElementById('loader-bar').style.width = percent + '%';
-    document.getElementById('loader-text').innerText = msg;
+// function updateLoader(msg, percent) {
+//     let loader = document.getElementById('zillow-loader');
+//     if (!loader) {
+//         const container = document.getElementById('search-page-list-container');
+//         if(!container) return;
+//         container.style.position = 'relative';
+//         loader = document.createElement('div');
+//         loader.id = 'zillow-loader';
+//         loader.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; color: #374151;`;
+//         loader.innerHTML = `<div style="width: 150px; height: 6px; background: #e5e7eb; border-radius: 99px;"><div id="loader-bar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.3s; border-radius: 99px;"></div></div><div id="loader-text" style="font-size: 13px; margin-top: 10px;">Starting...</div>`;
+//         container.appendChild(loader);
+//     }
+//     document.getElementById('loader-bar').style.width = percent + '%';
+//     document.getElementById('loader-text').innerText = msg;
+// }
+
+// --- LOADER UI (SMOOTH + CAPPED) ---
+let displayedProgress = 0;
+let targetProgress = 0;
+let progressInterval = null;
+
+function updateLoader(msg, percent, done = false) {
+  let loader = document.getElementById("zillow-loader");
+
+  if (!loader) {
+    const container = document.getElementById("search-page-list-container");
+    if (!container) return;
+
+    container.style.position = "relative";
+
+    loader = document.createElement("div");
+    loader.id = "zillow-loader";
+    loader.style.cssText = `
+      position:absolute; inset:0;
+      background:rgba(255,255,255,0.98);
+      z-index:1000;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      font-family:system-ui,sans-serif;
+    `;
+
+    loader.innerHTML = `
+      <div style="width:220px;height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden">
+        <div id="loader-bar" style="
+          height:100%;
+          width:0%;
+          background:linear-gradient(90deg,#2563eb,#3b82f6,#22c55e);
+          border-radius:999px;
+          transition:width 0.25s ease;
+        "></div>
+      </div>
+      <div id="loader-text" style="margin-top:14px;font-size:13px;color:#374151">
+        Starting…
+      </div>
+    `;
+
+    container.appendChild(loader);
+  }
+
+  // ✅ UPDATE TARGET EVERY CALL
+  targetProgress = done ? 100 : Math.min(percent, 90);
+
+  const bar = document.getElementById("loader-bar");
+  const text = document.getElementById("loader-text");
+  text.innerText = msg;
+
+  // ✅ START INTERVAL ONCE
+  if (!progressInterval) {
+    progressInterval = setInterval(() => {
+      // Smooth easing toward target
+      displayedProgress += (targetProgress - displayedProgress) * 0.15;
+
+      // Prevent tiny jitter
+      if (Math.abs(targetProgress - displayedProgress) < 0.2) {
+        displayedProgress = targetProgress;
+      }
+
+      bar.style.width = displayedProgress.toFixed(1) + "%";
+
+      // Finish cleanly
+      if (targetProgress === 100 && displayedProgress >= 99.8) {
+        bar.style.width = "100%";
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+    }, 40);
+  }
 }
+
 
 // --- SEARCH PAGE LOGIC ---
 async function startApp() {
