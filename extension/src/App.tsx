@@ -48,11 +48,11 @@ function App() {
             <div className="legend-details">
               <div className="legend-row">
                 <div className="glow-sample glow-green-preview"></div>
-                <span>Green Glow: Top properties with higher safety scores</span>
+                <span>Green Glow: Top properties with highest safety scores</span>
               </div>
               <div className="legend-row">
                 <div className="glow-sample glow-gold-preview"></div>
-                <span>Gold Glow: Top properties with higher lifestyle/convenience scores</span>
+                <span>Gold Glow: Top properties with highest lifestyle/convenience scores</span>
               </div>
               <div className="legend-row">
                 <span>Note: Only the top 3 properties display glowing borders</span>
