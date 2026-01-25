@@ -17,22 +17,22 @@ function App() {
         <div className="legend-items-container">
           <div className="legend-item">
             <div className="legend-label">
-              <div className="color-bar-indicator" style={{ backgroundColor: "#10b981" }}></div>
+              <div className="color-bar-indicator" style={{ backgroundColor: "#D9FCA7" }}></div>
               <span className="legend-text">
                 <strong>Score Bar Color</strong> (vertical bar between listing and score)
               </span>
             </div>
             <div className="legend-details">
               <div className="legend-row">
-                <div className="color-sample" style={{ backgroundColor: "#10b981" }}></div>
+                <div className="color-sample" style={{ backgroundColor: "#D9FCA7" }}></div>
                 <span>Green: Score 85-100 (Excellent)</span>
               </div>
               <div className="legend-row">
-                <div className="color-sample" style={{ backgroundColor: "#3b82f6" }}></div>
+                <div className="color-sample" style={{ backgroundColor: "#165AF5" }}></div>
                 <span>Blue: Score 70-84 (Good)</span>
               </div>
               <div className="legend-row">
-                <div className="color-sample" style={{ backgroundColor: "#f59e0b" }}></div>
+                <div className="color-sample" style={{ backgroundColor: "#F2B752" }}></div>
                 <span>Orange: Score below 70 (Fair)</span>
               </div>
             </div>
@@ -48,11 +48,11 @@ function App() {
             <div className="legend-details">
               <div className="legend-row">
                 <div className="glow-sample glow-green-preview"></div>
-                <span>Green Glow: Top properties with higher safety scores</span>
+                <span>Green Glow: Top properties with highest safety scores</span>
               </div>
               <div className="legend-row">
                 <div className="glow-sample glow-gold-preview"></div>
-                <span>Gold Glow: Top properties with higher lifestyle/convenience scores</span>
+                <span>Gold Glow: Top properties with highest lifestyle/convenience scores</span>
               </div>
               <div className="legend-row">
                 <span>Note: Only the top 3 properties display glowing borders</span>
