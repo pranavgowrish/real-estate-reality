@@ -4,8 +4,7 @@ from fastapi.responses import JSONResponse
 import requests
 import time
 from math import radians, sin, cos, sqrt, atan2
-from playwright.sync_api 
-import sync_playwright, TimeoutError
+from playwright.sync_api import sync_playwright, TimeoutError
 import pandas as pd
 import numpy as np
 
@@ -338,7 +337,7 @@ def get_emergency_services(zip_code: str):
             })
     
     score = get_emergency_score(services, lat, lon)
-    
+
     return JSONResponse(content={
         "services": services,
         "emergency_score": score
