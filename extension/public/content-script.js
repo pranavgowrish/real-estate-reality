@@ -228,37 +228,42 @@ function updateLoader(msg, percent, done = false) {
   }
 }
 
-const injectAfterResults = () => {
-  // Target the specific heading using the 'result-count' class
-  const target = document.querySelector("h1");
+async function startApp() {
+  const originalList = document.querySelector(LIST_CONTAINER_SEL);
+  if (!originalList) return;
 
-  if (target && !document.getElementById("sorter-toggle-bar")) {
-    const toggleBar = document.createElement("div");
-    toggleBar.id = "sorter-toggle-bar";
+  injectStyles();
 
-    toggleBar.innerHTML = `
-            <div style="font-size: 15px; font-weight: 700; color: #374151;">Property Score Calculation:</div>
-            <select id="roi-strategy-toggle" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #3b82f6; font-size: 13px; cursor: pointer;">
-                <option value="safe">Safety and Liveability</option>
-                <option value="invest">Return of Investment (ROI)</option>
-            </select>
-        `;
+  const imageUrl = chrome.runtime.getURL("rer.png");
+  const headtoadd = document.querySelector('h1[data-c11n-component="Heading"]');
 
-    toggleBar.style.cssText = `
-            padding: 5px 8px;
-            margin: 10px 0 8px 0;
-            background: #ffffff;
-            border-radius: 2px;
-            display: inline;
-            align-items: flex-end;
-            line-height: 28px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            font-family: -apple-system, sans-serif;        
-        `;
-
-    // This places it physically AFTER the <h2>
-    target.after(toggleBar);
-    console.log("Success: Toggle bar injected after result count.");
+  // Inject combined logo and toggle bar
+  if (!document.getElementById("ourlogoo") && headtoadd) {
+    const logo = document.createElement("div");
+    logo.id = "ourlogoo";
+    logo.style.cssText = `
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-radius: 6px;
+    `;
+    logo.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="font-size: 15px; font-weight: 700; color: #374151;">Property Score Calculation:</div>
+        <select id="roi-strategy-toggle" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #3b82f6; font-size: 13px; cursor: pointer;">
+          <option value="safe">Safety and Liveability</option>
+          <option value="invest">Return of Investment (ROI)</option>
+        </select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Powered by Invest For Real</span>
+        <img src="${imageUrl}" style="height: 20px;" />
+      </div>
+    `;
+    headtoadd.parentNode.appendChild(logo);
 
     // Set initial toggle value from storage
     const currentMode = getScoringMode();
@@ -270,53 +275,11 @@ const injectAfterResults = () => {
       const newMode = e.target.value;
       console.log(`Switching math to: ${newMode}`);
       setScoringMode(newMode);
-      // Trigger recalculation and re-render
       if (window.recalculateAndRender) {
         window.recalculateAndRender();
       }
     });
   }
-};
-
-// Run the interval to ensure it stays there
-const navTimer = setInterval(injectAfterResults, 1000);
-
-// --- SEARCH PAGE LOGIC ---
-async function startApp() {
-  const originalList = document.querySelector(LIST_CONTAINER_SEL);
-  if (!originalList) return;
-
-  injectStyles();
-
-    const imageUrl = chrome.runtime.getURL("rer.png");
-
-    if (!document.getElementById("ourlogoo")) {
-const logo = document.createElement("div");
-logo.id = "ourlogoo";
-logo.style.cssText = `
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between;
-    padding: 12px 16px;
-    margin-bottom: 16px;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-radius: 6px;
-`;
-logo.innerHTML = `
-    <h2 style="font-size: 18px; font-weight: 700; color: #111827; margin: 0; letter-spacing: -0.01em;">
-        Invest where it counts
-    </h2>
-    <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Powered by Invest For Real</span>
-        <img src="${imageUrl}" style="height: 20px;" />
-    </div>
-`;
-
-        const headtoadd = document.querySelector('h1[data-c11n-component="Heading"]');
-        if (headtoadd) {
-            headtoadd.parentNode.appendChild(logo);
-        }
-    }
   let allHTML = [];
   const firstPageItems = Array.from(document.querySelectorAll(LIST_ITEM_SEL));
   firstPageItems.forEach((item) => allHTML.push(item.outerHTML));
