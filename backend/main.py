@@ -35,6 +35,8 @@ EXAMPLE_INPUT= {
     "gym":""
 }
 
+CRIME_DICT = {}
+
 def convert_zipcode_to_latlon(zip_code: str):
     global last_nominatim_request
     headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
@@ -224,6 +226,8 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
 
 
 def get_crime_score(zipcode: str) -> float:
+    if zipcode in CRIME_DICT:
+        return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -259,6 +263,7 @@ def get_crime_score(zipcode: str) -> float:
 
         browser.close()
         print(f"Grade: {grade}")
+        CRIME_DICT[zipcode] = grade
         return GRADE_TO_SCORE.get(grade, 0.0)
 
 def convert_address_to_location(address: str):
