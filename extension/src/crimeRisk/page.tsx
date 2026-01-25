@@ -30,7 +30,7 @@ function CrimeRiskPage() {
 
     fetchServices();
   }, []);
-  if (loading) return <p>Loading crime risk...</p>;
+  if (loading) return <p>Loading...</p>;
 
   return <div>{score >= 0 ? score.toFixed(2) : "N/A"}</div>;
 }
