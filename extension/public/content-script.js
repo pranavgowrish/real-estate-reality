@@ -3,7 +3,7 @@ console.log("--- Super Sorter v31: Property Page Data Injection ---");
 // --- CONFIGURATION ---
 //const API_URL = "https://reelreal-realtor.hf.space/updateAddress"; 
 const API_URL = "http://127.0.0.1:8000/updateAddress";
-const MAX_PAGES_TO_FETCH = 1;
+const MAX_PAGES_TO_FETCH = 2;
 const DELAY_BETWEEN_PAGES = 1500;
 const TOP_TIER_COUNT = 3;
 const STORAGE_KEY = "all_data";
@@ -58,7 +58,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
   console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
   try {
-    const payload = { addresses: [propertyList[0]] };
+    const payload = { addresses: propertyList };
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -770,64 +770,61 @@ function startProperty() {
     };
 
     // --- HELPER: GENERATE INSIGHTS SENTENCES ---
-    const getVerdict = (d) => {
-      let pros = [];
-      let cons = [];
+// --- HELPER: GENERATE INSIGHTS SENTENCES ---
+const getVerdict = (d) => {
+  let pros = [];
+  let cons = [];
 
-      if (d.calculatedROI > 6)
-        pros.push(
-          `High yield potential with an estimated <span style='color:#10b981; font-weight:bold;'>${d.calculatedROI.toFixed(1)}% ROI</span>.`,
-        );
-      else if (d.calculatedROI < 3)
-        cons.push(
-          `Low yield estimated at only ${d.calculatedROI.toFixed(1)}% ROI.`,
-        );
+  if (d.calculatedROI > 6)
+    pros.push(
+      `High yield potential with an estimated <span style='color:#10b981; font-weight:bold;'>${d.calculatedROI.toFixed(1)}% ROI</span>.`,
+    );
+  else if (d.calculatedROI < 3)
+    cons.push(
+      `Low yield estimated at only ${d.calculatedROI.toFixed(1)}% ROI.`,
+    );
 
-      if (d.crime > 80)
-        pros.push(
-          `Located in a <span style='color:#10b981; font-weight:bold;'>very safe neighborhood</span> with low crime.`,
-        );
-      else if (d.crime < 50)
-        cons.push(
-          `Situated in a higher crime area which may impact long-term appreciation.`,
-        );
+  if (d.crime > 80)
+    pros.push(
+      `Located in a <span style='color:#10b981; font-weight:bold;'>very safe neighborhood</span> with low crime.`,
+    );
+  else if (d.crime < 50)
+    cons.push(
+      `Situated in a higher crime area which may impact long-term appreciation.`,
+    );
 
-      if (d.shop > 75 && d.cafe > 75)
-        pros.push(
-          `Excellent <span style='color:#3b82f6; font-weight:bold;'>walkability</span> to shops and cafes.`,
-        );
-      else if (d.shop < 40)
-        cons.push(`Car-dependent area with few nearby amenities.`);
+  if (d.shop > 75 && d.cafe > 75)
+    pros.push(
+      `Excellent <span style='color:#3b82f6; font-weight:bold;'>walkability</span> to shops and cafes.`,
+    );
+  else if (d.shop < 40)
+    cons.push(`Car-dependent area with few nearby amenities.`);
 
-      if (d.rentZestimate > d.purchasePrice * 0.007)
-        pros.push("Strong rent-to-price ratio.");
+  if (d.rentZestimate > d.purchasePrice * 0.007)
+    pros.push("Strong rent-to-price ratio.");
 
-        if (match) {
-            const d = match;
-            const scoreColor = d.finalScore >= 80 ? '#10b981' : (d.finalScore >= 60 ? '#f59e0b' : '#ef4444');
-            const imageUrl = chrome.runtime.getURL("rer.png");
+  // Combine into paragraphs
+  let html = "";
+  if (pros.length > 0)
+    html += `<div style="margin-bottom:8px;"><b>Investment Worth:</b> ${pros.join(" ")}</div>`;
+  if (cons.length > 0)
+    html += `<div><b>Risks to watch:</b> ${cons.join(" ")}</div>`;
 
-      // Combine into paragraphs
-      let html = "";
-      if (pros.length > 0)
-        html += `<div style="margin-bottom:8px;"><b>Investment Worth:</b> ${pros.join(" ")}</div>`;
-      if (cons.length > 0)
-        html += `<div><b>Risks to watch:</b> ${cons.join(" ")}</div>`;
+  if (!html)
+    html =
+      "This property shows average metrics across the board. It is a stable but standard investment choice.";
 
-      if (!html)
-        html =
-          "This property shows average metrics across the board. It is a stable but standard investment choice.";
+  return html;
+}; // <-- Add this closing brace
 
-      return html;
-    };
+if (match) {
+  const d = match;
+  const imageUrl = chrome.runtime.getURL("rer.png");
 
-    if (match) {
-      const d = match;
-
-      // Recalculate score based on current toggle mode
-      const scoringMode = getScoringMode();
-      let recalculatedScore;
-
+  // Recalculate score based on current toggle mode
+  const scoringMode = getScoringMode();
+  let recalculatedScore;
+  
       if (scoringMode === "invest") {
         // ROI mode: 70% ROI, 20% safety, 10% convenience
         const normalizedROI =
@@ -957,10 +954,6 @@ function startProperty() {
   injectPanel();
     setInterval(injectPanel, 1000);
   };
-
-  injectPanel();
-  setInterval(injectPanel, 1000);
-}
 
 startApp();
 
