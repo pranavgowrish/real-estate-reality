@@ -19,7 +19,9 @@ function EmergencyServicesPage() {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/emergency-services/${ZIP_CODE}`);
+        const res = await fetch(
+          `http://127.0.0.1:8000/api/emergency-services/${ZIP_CODE}`,
+        );
         const data = await res.json();
 
         if (data.error) {
@@ -64,4 +66,3 @@ function EmergencyServicesPage() {
 }
 
 export default EmergencyServicesPage;
-
