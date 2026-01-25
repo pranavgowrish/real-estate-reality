@@ -108,14 +108,14 @@
 }
 
 .glow-green-preview {
-  border-color: #10b981;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
-  background: rgba(16, 185, 129, 0.1);
+  border-color: #D9FCA7;
+  box-shadow: 0 0 10px rgba(122, 222, 109, 0.6);
+  background: rgba(24, 185, 16, 0.1);
 }
 
 .glow-gold-preview {
-  border-color: #f59e0b;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+  border-color: #F2B752;
+  box-shadow: 0 0 10px rgba(244, 143, 56, 0.6);
   background: rgba(245, 158, 11, 0.1);
 }
 

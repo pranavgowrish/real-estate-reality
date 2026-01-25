@@ -19,8 +19,8 @@ function injectStyles() {
   const style = document.createElement("style");
   style.id = styleId;
   style.innerHTML = `
-        @keyframes breatheGreen { 0% { box-shadow: 0 0 5px rgba(16,185,129,0.4); border-color:#10b981;} 50% { box-shadow: 0 0 25px rgba(16,185,129,0.7); border-color:#34d399;} 100% { box-shadow: 0 0 5px rgba(16,185,129,0.4); border-color:#10b981;} }
-        @keyframes breatheGold { 0% { box-shadow: 0 0 5px rgba(245,158,11,0.4); border-color:#f59e0b;} 50% { box-shadow: 0 0 25px rgba(245,158,11,0.7); border-color:#fbbf24;} 100% { box-shadow: 0 0 5px rgba(245,158,11,0.4); border-color:#f59e0b;} }
+        @keyframes breatheGreen { 0% { box-shadow: 0 0 5px rgba(16,185,129,0.4); border-color:#D9FCA7;} 50% { box-shadow: 0 0 25px rgba(16,185,129,0.7); border-color:#34d399;} 100% { box-shadow: 0 0 5px rgba(16,185,129,0.4); border-color:#D9FCA7;} }
+        @keyframes breatheGold { 0% { box-shadow: 0 0 5px rgba(245,158,11,0.4); border-color:#F2B752;} 50% { box-shadow: 0 0 25px rgba(245,158,11,0.7); border-color:#fbbf24;} 100% { box-shadow: 0 0 5px rgba(245,158,11,0.4); border-color:#F2B752;} }
         .glow-green { animation: breatheGreen 3s infinite ease-in-out; border-width: 3px; border-style: solid; z-index: 10; transform: scale(1.02); }
         .glow-gold { animation: breatheGold 3s infinite ease-in-out; border-width: 3px; border-style: solid; z-index: 10; transform: scale(1.02); }
     `;
@@ -182,7 +182,7 @@ function updateLoader(msg, percent, done = false) {
         <div id="loader-bar" style="
           height:100%;
           width:0%;
-          background:linear-gradient(90deg,#2563eb,#3b82f6,#22c55e);
+          background:linear-gradient(90deg,#2563eb,#A8E9FF,#22c55e);
           border-radius:999px;
           transition:width 0.25s ease;
         "></div>
@@ -190,7 +190,7 @@ function updateLoader(msg, percent, done = false) {
     <img src="${imageUrl}" style="position:absolute; height:80px; top:150px; animation:spin 4s linear infinite;" />
 
       <div id="loader-text" style="margin-top:14px;font-size:13px;color:#374151">
-      <div id="loader-text" style="margin-top:14px;font-size:16px;color:#080808;font-weight:bold; font-family: -apple-system, sans-serif;">
+      <div id="loader-text" style="margin-top:14px;font-size:16px;color:#080808;font-weight:extrabold; font-family: -apple-system, sans-serif;">
         Starting…
       </div>
     `;
@@ -238,7 +238,7 @@ const injectAfterResults = () => {
 
     toggleBar.innerHTML = `
             <div style="font-size: 15px; font-weight: 700; color: #374151;">Property Score Calculation:</div>
-            <select id="roi-strategy-toggle" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #3b82f6; font-size: 13px; cursor: pointer;">
+            <select id="roi-strategy-toggle" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #A8E9FF; font-size: 13px; cursor: pointer;">
                 <option value="safe">Safety and Liveability</option>
                 <option value="invest">Return of Investment (ROI)</option>
             </select>
@@ -447,8 +447,7 @@ logo.innerHTML = `
 
   let finalItems = mergedData.map((item, index) => {
     const finalScore = Math.floor(calculatedScores[index] * 100);
-    let badgeColor =
-      finalScore >= 85 ? "#10b981" : finalScore >= 70 ? "#3b82f6" : "#f59e0b";
+    let badgeColor = "#165AF5"; // Zillow blue
 
     // IMPORTANT: We explicitly save the 'finalScore' into the data object so we can read it on the detail page later
     item.data.finalScore = finalScore;
@@ -520,25 +519,25 @@ logo.innerHTML = `
                 </div>
                 <div style="margin-bottom: 15px;">
                     <div style="font-size: 14px; color: #4b5563; font-weight: 600;">
-                        Rent Estimate: <span style="color: #2563eb;">${d.rentZestimate ? "$" + d.rentZestimate + "/mo" : "N/A"}</span>
+                        Rent Estimate: <span style="color: #A8e9ff;">${d.rentZestimate ? "$" + d.rentZestimate + "/mo" : "N/A"}</span>
                     </div>
                     <div style="font-size: 14px; color: #4b5563; font-weight: 600;">
-                        Est. ROI: <span style="color: #10b981;">${d.calculatedROI.toFixed(2)}%</span>
+                        Est. ROI: <span style="color: #D9FCA7;">${d.calculatedROI.toFixed(2)}%</span>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 20px; align-items: center;">
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Safety</div>
-                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#10b981")}
-                        ${makeBigBar("EMS", Math.min(d.emprox, 100), "#3b82f6")}
-                        ${makeBigBar("Env", Math.min(d.envwell, 100), "#8b5cf6")}
+                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#D9FCA7")}
+                        ${makeBigBar("EMS", Math.min(d.emprox, 100), "#A8E9FF")}
+                        ${makeBigBar("Env", Math.min(d.envwell, 100), "#A17CF7")}
                     </div>
                     <div style="width: 1px; height: 100%; background: #e5e7eb;"></div>
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Convenience</div>
-                        ${makeBigBar("Shop", Math.min(d.shop, 100), "#f59e0b")}
+                        ${makeBigBar("Shop", Math.min(d.shop, 100), "#F2B752")}
                         ${makeBigBar("Cafe", Math.min(d.cafe, 100), "#ec4899")}
-                        ${makeBigBar("Gym", Math.min(d.gym, 100), "#6366f1")}
+                        ${makeBigBar("Gym", Math.min(d.gym, 100), "#B4B6FA")}
                     </div>
                 </div>
             </div>`;
@@ -589,8 +588,7 @@ function recalculateAndRender() {
   // Update final items with new scores
   let finalItems = mergedData.map((item, index) => {
     const finalScore = Math.floor(calculatedScores[index] * 100);
-    let badgeColor =
-      finalScore >= 85 ? "#10b981" : finalScore >= 70 ? "#3b82f6" : "#f59e0b";
+    let badgeColor = "#165AF5"; // Zillow blue
 
     item.data.finalScore = finalScore;
     item.data.scoringMode = scoringMode;
@@ -664,22 +662,22 @@ function recalculateAndRender() {
                         Rent Estimate: <span style="color: #2563eb;">${d.rentZestimate ? "$" + d.rentZestimate + "/mo" : "N/A"}</span>
                     </div>
                     <div style="font-size: 14px; color: #4b5563; font-weight: 600;">
-                        Est. ROI: <span style="color: #10b981;">${d.calculatedROI.toFixed(2)}%</span>
+                        Est. ROI: <span style="color: #D9FCA7;">${d.calculatedROI.toFixed(2)}%</span>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 20px; align-items: center;">
                     <div>
                         <div style="font-size: 12px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Safety</div>
-                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#10b981")}
-                        ${makeBigBar("EMS", Math.min(d.emprox, 100), "#3b82f6")}
-                        ${makeBigBar("Env", Math.min(d.envwell, 100), "#8b5cf6")}
+                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#D9FCA7")}
+                        ${makeBigBar("EMS", Math.min(d.emprox, 100), "#A8E9FF")}
+                        ${makeBigBar("Env", Math.min(d.envwell, 100), "#A17CF7")}
                     </div>
                     <div style="width: 1px; height: 100%; background: #e5e7eb;"></div>
                     <div>
                         <div style="font-size: 12px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Convenience</div>
-                        ${makeBigBar("Shop", Math.min(d.shop, 100), "#f59e0b")}
+                        ${makeBigBar("Shop", Math.min(d.shop, 100), "#F2B752")}
                         ${makeBigBar("Cafe", Math.min(d.cafe, 100), "#ec4899")}
-                        ${makeBigBar("Gym", Math.min(d.gym, 100), "#6366f1")}
+                        ${makeBigBar("Gym", Math.min(d.gym, 100), "#B4B6FA")}
                     </div>
                 </div>
             </div>`;
@@ -776,7 +774,7 @@ function startProperty() {
 
       if (d.calculatedROI > 6)
         pros.push(
-          `High yield potential with an estimated <span style='color:#10b981; font-weight:bold;'>${d.calculatedROI.toFixed(1)}% ROI</span>.`,
+          `High yield potential with an estimated <span style='color:#D9FCA7; font-weight:bold;'>${d.calculatedROI.toFixed(1)}% ROI</span>.`,
         );
       else if (d.calculatedROI < 3)
         cons.push(
@@ -785,7 +783,7 @@ function startProperty() {
 
       if (d.crime > 80)
         pros.push(
-          `Located in a <span style='color:#10b981; font-weight:bold;'>very safe neighborhood</span> with low crime.`,
+          `Located in a <span style='color:#D9FCA7; font-weight:bold;'>very safe neighborhood</span> with low crime.`,
         );
       else if (d.crime < 50)
         cons.push(
@@ -794,7 +792,7 @@ function startProperty() {
 
       if (d.shop > 75 && d.cafe > 75)
         pros.push(
-          `Excellent <span style='color:#3b82f6; font-weight:bold;'>walkability</span> to shops and cafes.`,
+          `Excellent <span style='color:#A8E9FF; font-weight:bold;'>walkability</span> to shops and cafes.`,
         );
       else if (d.shop < 40)
         cons.push(`Car-dependent area with few nearby amenities.`);
@@ -804,7 +802,7 @@ function startProperty() {
 
         if (match) {
             const d = match;
-            const scoreColor = d.finalScore >= 80 ? '#10b981' : (d.finalScore >= 60 ? '#f59e0b' : '#ef4444');
+            const scoreColor = d.finalScore >= 80 ? '#D9FCA7' : (d.finalScore >= 60 ? '#F2B752' : '#ef4444');
             const imageUrl = chrome.runtime.getURL("rer.png");
 
       // Combine into paragraphs
@@ -857,8 +855,7 @@ function startProperty() {
       }
 
       const finalScore = Math.floor(recalculatedScore * 100);
-      const scoreColor =
-        finalScore >= 80 ? "#10b981" : finalScore >= 60 ? "#f59e0b" : "#ef4444";
+      const scoreColor = "#165AF5"; // Zillow blue
 
       hello.innerHTML = `
                 <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 20px;">
@@ -868,7 +865,7 @@ function startProperty() {
                         </div>
                         <div>
                             <div style="font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px;">Score Calculation:</div>
-                            <select id="property-page-toggle" style="padding: 2px 6px; border-radius: 4px; border: 3px solid #3b82f6; font-size: 11px; cursor: pointer; font-family: -apple-system, sans-serif;">
+                            <select id="property-page-toggle" style="padding: 2px 6px; border-radius: 4px; border: 3px solid #A8E9FF; font-size: 11px; cursor: pointer; font-family: -apple-system, sans-serif;">
                                 <option value="safe">Safety and Liveability</option>
                                 <option value="invest">Return of Investment (ROI)</option>
                             </select>
@@ -878,9 +875,9 @@ function startProperty() {
 
                 <div style="display: flex; justify-content: space-around; align-items: flex-end; margin-bottom: 25px;">
                     ${makeGauge(Math.min(finalScore, 100), scoreColor, scoringMode === "invest" ? "ROI Score" : "Liveability", "Overall Score")}
-                    ${makeGauge(Math.min(d.calculatedROI * 10, 100), "#10b981", "Yield", `${d.calculatedROI.toFixed(2)}% ROI`)}
-                    ${makeGauge(Math.min((d.crime+d.emprox+d.envwell)/3, 100), "#3b82f6", "Safety", "Peace of Mind")}
-                    ${makeGauge(Math.min((Math.min(d.shop,100)+Math.min(d.gym,100)+Math.min(d.cafe,100))/3, 100), "#8b5cf6", "Convenience", "Walkability")}
+                    ${makeGauge(Math.min(d.calculatedROI * 10, 100), "#D9FCA7", "Yield", `${d.calculatedROI.toFixed(2)}% ROI`)}
+                    ${makeGauge(Math.min((d.crime+d.emprox+d.envwell)/3, 100), "#A8E9FF", "Safety", "Peace of Mind")}
+                    ${makeGauge(Math.min((Math.min(d.shop,100)+Math.min(d.gym,100)+Math.min(d.cafe,100))/3, 100), "#A17CF7", "Convenience", "Walkability")}
                 </div>
 
                 <div style="background: #f9fafb; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #374151; border-left: 4px solid ${scoreColor};">
@@ -893,7 +890,7 @@ function startProperty() {
                         <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
                             <span>Crime rate:</span> <span style="font-weight: 700;">${Math.min(d.crime, 100)}</span>
                         </div>
-                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
+                        <div style="font-size: 13px; color: #2563eb; display: flex; justify-content: space-between;">
                             <span>Emergency services proximity score:</span> <span style="font-weight: 700;">${Math.min(d.emprox, 100)}</span>
                         </div>
                         <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
