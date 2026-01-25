@@ -91,11 +91,29 @@ function getROI(rent, purchase_price) {
 }
 
 function normalizeROI(list) {
-  return list.map((item) => Math.min(Math.max(item, 0), 15) / 15);
+  if (list.length === 0) return [];
+
+  percentages = list.map(item => item / 10)
+  const min = Math.min(...percentages)
+  const max = Math.max(...percentages)
+
+  // Handle division by zero when all values are the same
+  if (max === min) return percentages.map(() => 0.5);
+
+  return percentages.map((item) => (item - min) / (max - min));
 }
 
 function normalize(list) {
-  return list.map((item) => Math.min(Math.max(item, 0), 100) / 100);
+  if (list.length === 0) return [];
+
+  percentages = list.map(item => item / 100)
+  const min = Math.min(...percentages)
+  const max = Math.max(...percentages)
+
+  // Handle division by zero when all values are the same
+  if (max === min) return percentages.map(() => 0.5);
+
+  return percentages.map((item) => (item - min) / (max - min));
 }
 
 function getInvestmentScore(roi_list, safety_list, convenience_list) {
@@ -131,9 +149,9 @@ function getROIScore(roi_list, safety_list, convenience_list) {
   const scores = [];
   for (let i = 0; i < roi_list.length; i++) {
     const score =
-      normalized_roi[i] * 0.7 +
-      normalized_safety[i] * 0.2 +
-      normalized_convenience[i] * 0.1;
+      normalized_roi[i] * 0.5 +
+      normalized_safety[i] * 0.35 +
+      normalized_convenience[i] * 0.15;
     scores.push(score);
   }
   return scores;
@@ -492,7 +510,7 @@ async function startApp() {
                 <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 20px; align-items: center;">
                     <div>
                         <div style="font-size: 13px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Safety</div>
-                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#10b981")}
+                        ${makeBigBar("Security", Math.min(d.crime, 100), "#10b981")}
                         ${makeBigBar("EMS", Math.min(d.emprox, 100), "#3b82f6")}
                         ${makeBigBar("Env", Math.min(d.envwell, 100), "#8b5cf6")}
                     </div>
@@ -633,7 +651,7 @@ function recalculateAndRender() {
                 <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 20px; align-items: center;">
                     <div>
                         <div style="font-size: 12px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Safety</div>
-                        ${makeBigBar("Crime", Math.min(d.crime, 100), "#10b981")}
+                        ${makeBigBar("Security", Math.min(d.crime, 100), "#10b981")}
                         ${makeBigBar("EMS", Math.min(d.emprox, 100), "#3b82f6")}
                         ${makeBigBar("Env", Math.min(d.envwell, 100), "#8b5cf6")}
                     </div>
