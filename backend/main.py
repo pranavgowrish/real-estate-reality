@@ -7,6 +7,7 @@ from math import radians, sin, cos, sqrt, atan2
 from playwright.sync_api import sync_playwright, TimeoutError
 import pandas as pd
 import numpy as np
+import re
 
 app = fastapi.FastAPI()
 
@@ -21,6 +22,18 @@ app.add_middleware(
 last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
 EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+EXAMPLE_INPUT= {
+    "address": "8276 Traveller St, Chino, CA 91708",
+    "listing_price": "$560,0003",
+    "sqft": "1,493",
+    "crime":"",
+    "emprox":"",
+    "envwell":"",
+    "shop":"",
+    "cafe":"",
+    "gym":""
+}
 
 def convert_zipcode_to_latlon(zip_code: str):
     global last_nominatim_request
@@ -85,7 +98,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 
-def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
+def get_fire_score(lat, lon, csv_path='ca_fire_hazard.csv'):
     """
     Returns a safety score from 0-30 based on proximity to fire hazard centroids in ca_fire_hazard.csv.
     """
@@ -126,7 +139,7 @@ def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
     else:
         return 30
 
-def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
+def get_aqi_score(lat, lon, csv_path='ca_city_avg_aqi.csv'):
     # 2. Load the AQI dataset
     df = pd.read_csv(csv_path)
 
@@ -168,12 +181,11 @@ def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
     return aqi_pts
 
 
-def get_wellness_score(zip_code):
+def get_wellness_score(zip_code, lat, lon):
     #add stuff in both get fire score and get aqi score
     # 1. Get the home coordinates
-    lat, lon, error = convert_zipcode_to_latlon(zip_code)
-    if error:
-        return {"error": f"Could not locate zip code: {error}"}
+    if lat is None or lon is None:
+        return {"error": "Invalid coordinates"}
 
     fire_score = get_fire_score(lat, lon)
     aqi_score = get_aqi_score(lat, lon)
@@ -249,45 +261,66 @@ def get_crime_score(zipcode: str) -> float:
         print(f"Grade: {grade}")
         return GRADE_TO_SCORE.get(grade, 0.0)
 
-    
-if __name__ == '__main__': # For testing onlyyyy
-    get_crime_score("92691")
+def convert_address_to_location(address: str):
+    url = "https://nominatim.openstreetmap.org/search"
+    headers = {
+        "User-Agent": "SafetyMap/1.0 (contact: {EMAIL})"
+    }
 
+    # First, try full address geocoding
+    params = {
+        "q": address + ", USA",
+        "format": "json",
+        "addressdetails": 1,
+        "limit": 3
+    }
 
-def convert_zipcode_to_latlon(zip_code: str):
-    global last_nominatim_request
-    headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
+    resp = requests.get(url, params=params, headers=headers, timeout=10)
 
-    # Rate limit Nominatim requests
-    elapsed = time.time() - last_nominatim_request
-    if elapsed < NOMINATIM_DELAY:
-        time.sleep(NOMINATIM_DELAY - elapsed)
-    
-    geo_res = requests.get(
-        f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
-        headers=headers
-    )
-    last_nominatim_request = time.time()
-    
     try:
-        geo_data = geo_res.json()
-    except Exception as e:
-        return None, None, f"Nominatim returned invalid JSON: {e}"
+        data = resp.json()
+    except Exception:
+        data = []
 
-    if not geo_data:
-        return None, None, "ZIP code not found"
+    # if geocoding failed
+    if not data:
+        # Try to extract ZIP from the address
+        zip_match = re.search(r"\b\d{5}(?:-\d{4})?\b", address)
+        zip_code = zip_match.group(0) if zip_match else None
 
-    lat = float(geo_data[0]["lat"])
-    lon = float(geo_data[0]["lon"])
-    return lat, lon, None
+        lat = lon = None
+
+        if zip_code:
+            # Try geocoding ZIP code itself
+            zip_params = {
+                "q": zip_code + ", USA",
+                "format": "json",
+                "limit": 1
+            }
+            zip_resp = requests.get(url, params=zip_params, headers=headers, timeout=10)
+            try:
+                zip_data = zip_resp.json()
+                if zip_data:
+                    lat = float(zip_data[0]["lat"])
+                    lon = float(zip_data[0]["lon"])
+            except Exception:
+                pass
+
+        print(f"No full address match. Using ZIP: {zip_code} -> Lat: {lat}, Lon: {lon}")
+        return zip_code, lat, lon
+
+    # Normal successful case
+    result = data[0]
+    lat = float(result["lat"])
+    lon = float(result["lon"])
+    zip_code = result.get("address", {}).get("postcode")
+
+    print(f"Geocoded Address: {address} -> ZIP: {zip_code}, Lat: {lat}, Lon: {lon}")
+    return zip_code, lat, lon
 
 
-@app.get("/api/emergency-services/{zip_code}")
-def get_emergency_services(zip_code: str):
-    # Zip code to longitude and latitude conversion
-    lat, lon, error = convert_zipcode_to_latlon(zip_code)
 
-    # Overpass query with 'out center' to get coordinates for ways
+def get_emergency_services(zip_code: str, lat: float, lon: float) -> float:
     overpass_query = f"""
     [out:json][timeout:25];
     (
@@ -306,7 +339,7 @@ def get_emergency_services(zip_code: str):
         overpass_res.raise_for_status()
         overpass_data = overpass_res.json()
     except Exception as e:
-        return {"services": [], "error": f"Overpass API error: {e}", "emergency_score": -1}
+        return -1
 
     services = []
     for el in overpass_data.get("elements", []):
@@ -326,15 +359,44 @@ def get_emergency_services(zip_code: str):
     
     score = get_emergency_score(services, lat, lon)
 
-    return JSONResponse(content={
-        "services": services,
-        "emergency_score": score
-    })
+    return score
+
+app.post("/updateAddress")
+def get_address(EXAMPLE_INPUT: dict):
+    address = EXAMPLE_INPUT['address']
+    listing_price = EXAMPLE_INPUT['listing_price']
+    sqft = EXAMPLE_INPUT['sqft']
+    crime = EXAMPLE_INPUT['crime']
+    emprox = EXAMPLE_INPUT['emprox']
+    envwell = EXAMPLE_INPUT['envwell']
+    shop = EXAMPLE_INPUT['shop']
+    cafe = EXAMPLE_INPUT['cafe']
+    gym = EXAMPLE_INPUT['gym']
+
+    zip, lat, lon = convert_address_to_location(address)
+
+    crime = get_crime_score(zip)
+    emprox = get_emergency_services(zip, lat, lon)
+    envwell = get_wellness_score(zip, lat, lon)
+
+    print("Crime:", crime)
+    print("Emprox:", emprox)
+    print("Envwell:", envwell)
+
+    print("Address:", address)
 
 
-@app.get("/api/crime-score/{zip_code}")
-def api_get_crime_score(zip_code: str):
-    score = get_crime_score(zip_code)
-    return JSONResponse(content={
-        "crime_score": score
-    })
+
+# if __name__ == '__main__': # For testing onlyyyy
+#     EXAMPLE_INPUT = {
+#         "address": "601 Matthew Ct, Braintree, MA 02184",
+#         "listing_price": "$560,000",
+#         "sqft": "1,493",
+#         "crime": "",
+#         "emprox": "",
+#         "envwell": "",
+#         "shop": "",
+#         "cafe": "",
+#         "gym": ""
+#     }
+#     get_address(EXAMPLE_INPUT)
