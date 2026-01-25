@@ -522,36 +522,39 @@ def get_gym(lat: float, lon: float) -> float:
     return score
 
 app.post("/updateAddress")
-def get_address(EXAMPLE_INPUT: dict):
-    address = EXAMPLE_INPUT['address']
-    listing_price = EXAMPLE_INPUT['listing_price']
-    sqft = EXAMPLE_INPUT['sqft']
-    crime = EXAMPLE_INPUT['crime']
-    emprox = EXAMPLE_INPUT['emprox']
-    envwell = EXAMPLE_INPUT['envwell']
-    shop = EXAMPLE_INPUT['shop']
-    cafe = EXAMPLE_INPUT['cafe']
-    gym = EXAMPLE_INPUT['gym']
+def get_address(addresses: list):
+    final_results = []
+    for address in addresses:
+        tempDict = address
+        address_str = tempDict.get("address", "")
+        listing_price = tempDict.get("listing_price", "")
+        sqft = tempDict.get("sqft", "")
+        crime = tempDict.get("crime", "")
+        emprox = tempDict.get("emprox", "")
+        envwell = tempDict.get("envwell", "")
+        shop = tempDict.get("shop", "")
+        cafe = tempDict.get("cafe", "")
+        gym = tempDict.get("gym", "")
 
-    zip, lat, lon = convert_address_to_location(address)
+        zip_code, lat, lon = convert_address_to_location(address_str)
 
-    crime = get_crime_score(zip)
-    emprox = get_emergency_services(zip, lat, lon)
-    envwell = get_wellness_score(zip, lat, lon)
-    shop = get_shops(lat, lon)
-    cafe = get_cafes(lat, lon)
-    gym = get_gym(lat, lon)
-
-    print("Crime:", crime)
-    print("Emprox:", emprox)
-    print("Envwell:", envwell)
-    print("Shop:", shop)
-    print("Cafe:", cafe)
-    print("Gym:", gym)
-
-    print("Address:", address)
-
-
+        crime = get_crime_score(zip_code)
+        emprox = get_emergency_services(zip_code, lat, lon)
+        envwell = get_wellness_score(zip_code, lat, lon)
+        shop = get_shops(lat, lon)
+        cafe = get_cafes(lat, lon)
+        gym = get_gym(lat, lon)
+        tempDict["crime"] = crime
+        tempDict["emprox"] = emprox
+        tempDict["envwell"] = envwell
+        tempDict["shop"] = shop
+        tempDict["cafe"] = cafe
+        tempDict["gym"] = gym
+        final_results.append(tempDict)
+    message = {
+        "results": final_results
+    }
+    return JSONResponse(content=message)
 
 if __name__ == '__main__': # For testing onlyyyy
     EXAMPLE_INPUT = {
