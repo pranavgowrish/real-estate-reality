@@ -1,23 +1,20 @@
 {
-    "manifest_version": 3,
-    "version": "1.0.0",
-    "name": "Real Estate Reality",
-    "action": {
-        "default_popup": "index.html"
-    },
-    "permissions": ["activeTab", "scripting"],
-    "content_scripts": [
-        {
-            "matches": ["https://www.zillow.com/*"],
-            "js": ["content-script.js"]
-        }
-    ],
-    
-    "host_permissions": [
-        "http://*/*",
-        "https://*/*"
-    ],
-    "icons": {
-        "32": "rer.png"
+  "manifest_version": 3,
+  "version": "1.0.0",
+  "name": "Real Estate Reality",
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.zillow.com/*"],
+      "js": ["content-script.js"]
     }
+  ],
+
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "icons": {
+    "32": "rer.png"
+  }
 }
