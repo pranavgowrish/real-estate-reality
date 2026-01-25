@@ -284,52 +284,61 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
 #         return GRADE_TO_SCORE.get(fallback_grade, 0.0)
 
 
-async def get_crime_score(zipcode: str, context) -> float:
-    # 1. Check Cache first
+async def get_crime_score(zipcodes: []) -> float:
     if zipcode in CRIME_DICT:
         return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
 
-    page = None
     try:
-        # 2. OPEN A NEW TAB (Lightweight)
-        # We use the context passed in, rather than launching a whole new browser
-        page = await context.new_page()
-        
-        # 3. YOUR EXISTING LOGIC
-        await page.goto("https://crimegrade.org/", timeout=60000)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"]
+            )
+            # print(f"BROWSER LAUNCHED FOR {zipcode}")
+            context = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0.0.0 Safari/537.36"
+                )
+            )
+            page = await context.new_page()
+            await page.goto("https://crimegrade.org/", timeout=60000)
 
-        # Optimization: Wait for selector to be ready before clicking
-        zip_input = page.get_by_placeholder("Zip code")
-        await zip_input.click()
-        await zip_input.fill(zipcode)
+            zip_input = page.get_by_placeholder("Zip code")
+            await zip_input.click()
+            await zip_input.fill(zipcode)
 
-        await page.get_by_role("button", name="Explore").click()
-        
-        # Wait for the result to appear
-        grade_el = (
-            page.locator("text=Overall Crime Grade™")
-            .locator("xpath=preceding-sibling::*[1]")
-        )
-        await grade_el.wait_for(state="visible", timeout=30000)
-        
-        grade = await grade_el.inner_text()
-        grade = grade.strip()
+            grades = []
+            
+            for zipcode in zipcodes:
+                await page.get_by_role("button", name="Explore").click()
+                # await page.wait_for_timeout(2000)
 
-        # 4. CLOSE THE TAB (Free up RAM)
-        await page.close()
+                grade_el = (
+                    page.locator("text=Overall Crime Grade™")
+                    .locator("xpath=preceding-sibling::*[1]")
+                )
+                await grade_el.wait_for(state="visible", timeout=20000)
+                grade = await grade_el.inner_text()
+                grade = grade.strip()
+                grades.append(grade)
 
-        CRIME_DICT[zipcode] = grade
-        print(f"✅ Crime for {zipcode}: {grade}")
-        return GRADE_TO_SCORE.get(grade, 0.0)
+            await browser.close()
+            CRIME_DICT[zipcode] = grade
+            print(f"Crime for {zipcode}: {grade}")
+            
+            final_grades = []
+            for grade in grades:
+                final_grades.append(GRADE_TO_SCORE.get(grade, 0.0))
+            
+            return final_grades
 
-    except Exception as e:
-        print(f"❌ Failed crime for {zipcode}: {e}")
-        # Always close page on error to prevent leaks
-        if page: await page.close()
-        
-        fallback = "C+"
-        CRIME_DICT[zipcode] = fallback
-        return GRADE_TO_SCORE.get(fallback, 0.0)
+    except (PlaywrightTimeoutError, Exception) as e:
+        print(f"Failed to get crime grade for {zipcode}: {e}")
+        fallback_grade = "C+"  # default fallback
+        CRIME_DICT[zipcode] = fallback_grade
+        return GRADE_TO_SCORE.get(fallback_grade, 0.0)
 
 
 def convert_address_to_location(address: str):
@@ -693,24 +702,10 @@ async def multithreading(request: Request):
         lat_list.append(lat)
         lon_list.append(lon)
         
-        # crime = await get_crime_score(zip_code)
+    
+    # crime = await get_crime_score(zip_code)
         # crime = get_crime_score(zip_code)
-        # crime_list.append(crime)
-        
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        
-        # Create the Context (Incognito window)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
-        )
-
-        # --- RUN TASKS IN PARALLEL ---
-        # Notice we pass 'context' to the function now!
-        crime_tasks = [get_crime_score(zip, context) for zip in zip_list]
-        crime_list = await asyncio.gather(*crime_tasks)
-
-        await browser.close()
+    crime_list = await get_crime_score(zip_list)
         
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         # address_results = list(executor.map(get_crime_score, zip_list))
