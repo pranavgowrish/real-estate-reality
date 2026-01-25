@@ -285,8 +285,10 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
 
 
 async def get_crime_score(zipcodes: []) -> float:
-    if zipcode in CRIME_DICT:
-        return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
+    
+    for zipcode in zipcodes:
+        if zipcode in CRIME_DICT:
+            return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
 
     try:
         async with async_playwright() as p:
@@ -305,13 +307,13 @@ async def get_crime_score(zipcodes: []) -> float:
             page = await context.new_page()
             await page.goto("https://crimegrade.org/", timeout=60000)
 
-            zip_input = page.get_by_placeholder("Zip code")
-            await zip_input.click()
-            await zip_input.fill(zipcode)
-
             grades = []
             
             for zipcode in zipcodes:
+                zip_input = page.get_by_placeholder("Zip code")
+                await zip_input.click()
+                await zip_input.fill(zipcode)
+
                 await page.get_by_role("button", name="Explore").click()
                 # await page.wait_for_timeout(2000)
 
@@ -323,10 +325,13 @@ async def get_crime_score(zipcodes: []) -> float:
                 grade = await grade_el.inner_text()
                 grade = grade.strip()
                 grades.append(grade)
+                
+                await page.goto("https://crimegrade.org/", timeout=60000)
 
             await browser.close()
-            CRIME_DICT[zipcode] = grade
-            print(f"Crime for {zipcode}: {grade}")
+            for grade, zipcode in zip(grades, zipcodes):
+                CRIME_DICT[zipcode] = grade
+            # print(f"Crime for {zipcode}: {grade}")
             
             final_grades = []
             for grade in grades:
