@@ -1,29 +1,2 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Libre Caslon Text', serif;
-  background: linear-gradient(135deg, #040723 0%, #300a5f 100%);
-  color: #fff;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: left;
-  display: flex;
-  justify-content: flex-start;
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
-  text-align: left;
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-}
