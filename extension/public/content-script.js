@@ -53,7 +53,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
     console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
     try {
-        const payload = { addresses: [propertyList[0]]}; 
+        const payload = { addresses: propertyList}; 
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -116,6 +116,7 @@ function updateLoader(msg, percent, done = false) {
   if (!loader) {
     const container = document.getElementById("search-page-list-container");
     if (!container) return;
+    const imageUrl = chrome.runtime.getURL("rer.png");
 
     container.style.position = "relative";
 
@@ -142,6 +143,8 @@ function updateLoader(msg, percent, done = false) {
           transition:width 0.25s ease;
         "></div>
       </div>
+    <img src="${imageUrl}" style="position:absolute; height:80px; top:150px; animation:spin 4s linear infinite;" />
+
       <div id="loader-text" style="margin-top:14px;font-size:13px;color:#374151">
         Starting…
       </div>
@@ -268,7 +271,7 @@ logo.innerHTML = `
 
     if (scrapeQueue.length === 0) { updateLoader("No properties found.", 100); return; }
 
-    updateLoader(`Analyzing ${scrapeQueue.length} items...`, 60);
+    updateLoader(`Analyzing all properties...`, 60);
     
     const [apiResults, rentResults] = await Promise.all([
         fetchBatchAnalysis(scrapeQueue), 
@@ -500,10 +503,12 @@ function startProperty() {
         if (match) {
             const d = match;
             const scoreColor = d.finalScore >= 80 ? '#10b981' : (d.finalScore >= 60 ? '#f59e0b' : '#ef4444');
+            const imageUrl = chrome.runtime.getURL("rer.png");
+
 
             hello.innerHTML = `
                 <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 20px;">
-
+                <img src="${imageUrl}" style="height: 40px; vertical-align: middle; margin-right: 8px;" />
                     <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 5px;">Real Estate Reality: Investment Report</div>
                     <div style="font-size: 13px; color: #6b7280;">Analysis based on rent, crime, and lifestyle data.</div>
                 </div>
@@ -511,8 +516,8 @@ function startProperty() {
                 <div style="display: flex; justify-content: space-around; align-items: flex-end; margin-bottom: 25px;">
                     ${makeGauge(Math.min(d.finalScore, 100), scoreColor, "Investment", "Overall Score")}
                     ${makeGauge(Math.min(d.calculatedROI * 10, 100), "#10b981", "Yield", `${d.calculatedROI.toFixed(2)}% ROI`)}
-                    ${makeGauge(Math.min(d.crime, 100), "#3b82f6", "Safety", "Crime Index")}
-                    ${makeGauge(Math.min(d.shop, 100), "#8b5cf6", "Convenience", "Walkability")}
+                    ${makeGauge(Math.min((d.crime+d.emprox+d.envwell)/3, 100), "#3b82f6", "Safety", "Peace of Mind")}
+                    ${makeGauge(Math.min((Math.min(d.shop,100)+Math.min(d.gym,100)+Math.min(d.cafe,100))/3, 100), "#8b5cf6", "Convenience", "Walkability")}
                 </div>
 
                 <div style="background: #f9fafb; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #374151; border-left: 4px solid ${scoreColor};">
@@ -547,7 +552,7 @@ function startProperty() {
                         </div>
                         <div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">
                             • ${
-                                (0.9 * (d.gym + d.cafe + d.shop)) > 270
+                                (0.9 * (Math.min(d.gym,100) + Math.min(d.cafe,100) + Math.min(100,d.shop))) > 270
                                 ? 'Many amenities nearby (gyms, cafes, shops)'
                                 : (0.9 * (d.gym + d.cafe + d.shop)) > 180
                                     ? 'Mediocre amount of amenities nearby'
