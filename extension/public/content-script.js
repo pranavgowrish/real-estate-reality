@@ -58,7 +58,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
   console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
   try {
-    const payload = { addresses: [propertyList[0]] };
+    const payload = { addresses: propertyList };
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,141 +1,64 @@
-import EmergencyServicesPage from "./emergencyServices/page";
-import CrimeRiskPage from "./crimeRisk/page";
-import GradeCard from "./GradeCard";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { useState } from "react";
-import ConvenienceCard from "./ConvenienceCard";
-import RestaurantsPage from "./restaurants/page";
-import ShoppingPage from "./shopping/page";
-import AmenitiesPage from "./amenities/page";
+import "./App.css";
 
 function App() {
-  const [isSafetyVisible, setIsSafetyVisible] = useState(false);
-  const [isConvenVisible, setIsConvenVisible] = useState(false);
-
-  const toggleSafetyVisibility = () => {
-    setIsSafetyVisible(!isSafetyVisible);
-  };
-
-  const toggleConvenVisibility = () => {
-    setIsConvenVisible(!isConvenVisible);
-  };
-
   return (
-    <div className="w-90 p-4">
-      <div className="flex items-center gap-3 mb-4">
-        <img src="/rer.png" alt="RER Logo" className="w-10 h-10" />
-        <div>
-          <h1 className="text-2xl shadow-2xl tracking-[-0.02em] font-extrabold">
-            Real Estate Reality
-          </h1>
-          <p className="text-m shadow-2xl font-semibold text-[#006aff]">
-            Safety & livability overview
-          </p>
+    <div className="app-container">
+      <div className="header-section">
+        <div className="logo-title-row">
+          <img src="/rer.png" alt="RER Logo" className="logo-img" />
+          <h1 className="app-title">Real Estate Reality</h1>
+          <h2 className="app-description">Safety & livability overview</h2>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="w-full">
-          <button
-            className="cursor-pointer w-full"
-            onClick={toggleSafetyVisibility}
-          >
-            <GradeCard title="Safety Grade: " grade="FIX" />
-            {!isSafetyVisible && (
-              <FaChevronDown
-                className="inline-block ml-2"
-                id="safety-details"
-              />
-            )}
-          </button>
-        </div>
-        {isSafetyVisible && (
-          <div className="space-y-2 w-4/5 pl-20" id="safety-details">
-            <div className="">
-              <GradeCard title="Crime Risk: " grade={<CrimeRiskPage />} />
+      <div className="legend-section">
+        <h2 className="legend-title">Color Guide</h2>
+        
+        <div className="legend-items-container">
+          <div className="legend-item">
+            <div className="legend-label">
+              <div className="color-bar-indicator" style={{ backgroundColor: "#10b981" }}></div>
+              <span className="legend-text">
+                <strong>Score Bar Color</strong> (vertical bar between listing and score)
+              </span>
             </div>
-            <div className="">
-              <GradeCard
-                title="Emergency Services: "
-                grade={<EmergencyServicesPage />}
-              />
-            </div>
-            <div className="">
-              <GradeCard title="Environment & Wellness: " grade="FIX" />
+            <div className="legend-details">
+              <div className="legend-row">
+                <div className="color-sample" style={{ backgroundColor: "#10b981" }}></div>
+                <span>Green: Score 85-100 (Excellent)</span>
+              </div>
+              <div className="legend-row">
+                <div className="color-sample" style={{ backgroundColor: "#3b82f6" }}></div>
+                <span>Blue: Score 70-84 (Good)</span>
+              </div>
+              <div className="legend-row">
+                <div className="color-sample" style={{ backgroundColor: "#f59e0b" }}></div>
+                <span>Orange: Score below 70 (Fair)</span>
+              </div>
             </div>
           </div>
-        )}
-        {isSafetyVisible && (
-          <div className="w-full">
-            <button
-              className="cursor-pointer w-full"
-              onClick={toggleSafetyVisibility}
-            >
-              {isSafetyVisible && (
-                <FaChevronUp
-                  className="inline-block ml-2"
-                  id="safety-details"
-                />
-              )}
-            </button>
-          </div>
-        )}
-        <div className="w-full">
-          <button
-            className="cursor-pointer w-full"
-            onClick={toggleConvenVisibility}
-          >
-            <GradeCard title="Convenience Grade: " grade="FIX" />
-            {!isConvenVisible && (
-              <FaChevronDown
-                className="inline-block ml-2"
-                id="conven-details"
-              />
-            )}
-          </button>
-        </div>
-        {isConvenVisible && (
-          <div className="space-y-2 w-4/5 pl-20" id="conven-details">
-            <div className="">
-              <ConvenienceCard
-                title="Restaurants: "
-                conven={<RestaurantsPage />}
-              />
-            </div>
-            <div className="">
-              <ConvenienceCard title="Shopping: " conven={<ShoppingPage />} />
-            </div>
-            <div className="">
-              <ConvenienceCard title="Amenities: " conven={<AmenitiesPage />} />
-            </div>
-          </div>
-        )}
-        {isConvenVisible && (
-          <div className="w-full">
-            <button
-              className="cursor-pointer w-full"
-              onClick={toggleConvenVisibility}
-            >
-              {isConvenVisible && (
-                <FaChevronUp
-                  className="inline-block ml-2"
-                  id="conven-details"
-                />
-              )}
-            </button>
-          </div>
-        )}
 
-        <div>
-          <button className="cursor-pointer w-full">
-            <GradeCard title="Current Price: " grade="FIX" />
-          </button>
-        </div>
-
-        <div>
-          <button className="cursor-pointer w-full">
-            <GradeCard title="Market Price Estimate: " grade="FIX" />
-          </button>
+          <div className="legend-item">
+            <div className="legend-label">
+              <div className="glow-indicator glow-green-preview"></div>
+              <span className="legend-text">
+                <strong>Glowing Border</strong> (around property listing + score box)
+              </span>
+            </div>
+            <div className="legend-details">
+              <div className="legend-row">
+                <div className="glow-sample glow-green-preview"></div>
+                <span>Green Glow: Top properties with higher safety scores</span>
+              </div>
+              <div className="legend-row">
+                <div className="glow-sample glow-gold-preview"></div>
+                <span>Gold Glow: Top properties with higher lifestyle/convenience scores</span>
+              </div>
+              <div className="legend-row">
+                <span>Note: Only the top 3 properties display glowing borders</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
