@@ -60,38 +60,49 @@ def haversine(lat1, lon1, lat2, lon2):
 
 
 def convert_address_to_location(address: str):
-    url = "https://nominatim.openstreetmap.org/search"
-    headers = {"User-Agent": f"SafetyMap/1.0 (contact: {EMAIL})"}
+    """
+    Uses the US Census Bureau Geocoder (Free, No API Key).
+    This bypasses the OpenStreetMap ban.
+    """
+    print(f"Geocoding via US Census: {address}")
+    url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 
-    params = {"q": address + ", USA", "format": "json", "addressdetails": 1, "limit": 3}
-    resp = requests.get(url, params=params, headers=headers, timeout=10)
+    params = {
+        "address": address,
+        "benchmark": "Public_AR_Current",
+        "format": "json"
+    }
 
     try:
+        # The Census API is slightly slower, so give it a longer timeout
+        resp = requests.get(url, params=params, timeout=15)
+        resp.raise_for_status()
         data = resp.json()
-    except Exception:
-        data = []
+        
+        matches = data.get("result", {}).get("addressMatches", [])
+        
+        if not matches:
+            print(f"Census found no match for: {address}")
+            # Fallback: Try to extract ZIP manually from string if API fails
+            zip_match = re.search(r"\b\d{5}\b", address)
+            return (zip_match.group(0) if zip_match else None), None, None
 
-    if not data:
-        zip_match = re.search(r"\b\d{5}(?:-\d{4})?\b", address)
-        zip_code = zip_match.group(0) if zip_match else None
-        lat = lon = None
-        if zip_code:
-            zip_resp = requests.get(url, params={"q": zip_code + ", USA", "format": "json", "limit": 1},
-                                    headers=headers, timeout=10)
-            try:
-                zip_data = zip_resp.json()
-                if zip_data:
-                    lat = float(zip_data[0]["lat"])
-                    lon = float(zip_data[0]["lon"])
-            except Exception:
-                pass
-        return zip_code, lat, lon
+        # Take the first match
+        match = matches[0]
+        coords = match.get("coordinates", {})
+        components = match.get("addressComponents", {})
 
-    result = data[0]
-    lat = float(result["lat"])
-    lon = float(result["lon"])
-    zip_code = result.get("address", {}).get("postcode")
-    return zip_code, lat, lon
+        # Census returns 'x' (Longitude) and 'y' (Latitude)
+        lon = coords.get("x")
+        lat = coords.get("y")
+        zip_code = components.get("zip")
+
+        print(f"Census success: {lat}, {lon}, {zip_code}")
+        return zip_code, float(lat), float(lon)
+
+    except Exception as e:
+        print(f"Census Geocoding failed: {e}")
+        return None, None, None
 
 
 # --- FIRE + AQI SCORES ---
@@ -261,13 +272,21 @@ def compute_all_scores(amenities: dict, lat: float, lon: float, zip_code: str) -
 
 # --- Playwright: get crime score for multiple ZIPs in one browser session ---
 async def get_crime_score(zipcodes: list) -> list:
-    results = []
-    to_fetch = [z for z in zipcodes if z not in CRIME_DICT]
+    # Get unique zipcodes while preserving order for the first occurrence
+    unique_zips = []
+    seen = set()
+    for z in zipcodes:
+        if z not in seen:
+            unique_zips.append(z)
+            seen.add(z)
+    
+    # Only fetch zipcodes that aren't already in CRIME_DICT
+    to_fetch = [z for z in unique_zips if z not in CRIME_DICT]
 
     if to_fetch:
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+                browser = await p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
                 context = await browser.new_context(
                     user_agent=("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
@@ -279,10 +298,20 @@ async def get_crime_score(zipcodes: list) -> list:
                     zip_input = page.get_by_placeholder("Zip code")
                     await zip_input.fill(zipcode)
                     await page.get_by_role("button", name="Explore").click()
-                    grade_el = page.locator("text=Overall Crime Grade™").locator("xpath=preceding-sibling::*[1]")
-                    await grade_el.wait_for(state="visible", timeout=20000)
-                    grade = (await grade_el.inner_text()).strip()
-                    CRIME_DICT[zipcode] = grade
+                    
+                    try:
+                        # Try to get the grade with a shorter timeout
+                        grade_el = page.locator("text=Overall Crime Grade™").locator("xpath=preceding-sibling::*[1]")
+                        await grade_el.wait_for(state="visible", timeout=1000)
+                        grade = (await grade_el.inner_text()).strip()
+                        CRIME_DICT[zipcode] = grade
+                    except:
+                        # If it times out or fails, check for error message
+                        error_visible = await page.locator("text=Please try another zipcode").is_visible()
+                        if error_visible:
+                            print(f"Invalid zipcode: {zipcode}")
+                        CRIME_DICT[zipcode] = "C+"
+                    
                     await page.goto("https://crimegrade.org/", timeout=60000)
 
                 await browser.close()
@@ -291,6 +320,8 @@ async def get_crime_score(zipcodes: list) -> list:
             for z in to_fetch:
                 CRIME_DICT[z] = "C+"
 
+    # Return results in the same order as input, using cached values for all zipcodes
+    results = []
     for z in zipcodes:
         results.append(GRADE_TO_SCORE.get(CRIME_DICT.get(z, "C+"), 0))
     return results
