@@ -236,58 +236,100 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
     return score
 
 
-async def get_crime_score(zipcode: str) -> float:
-    print(f"GETTING CRIME SCORE FOR {zipcode}")
+# async def get_crime_score(zipcode: str) -> float:
+#     if zipcode in CRIME_DICT:
+#         return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
+
+#     try:
+#         async with async_playwright() as p:
+#             browser = await p.chromium.launch(
+#                 headless=True,
+#                 args=["--disable-blink-features=AutomationControlled"]
+#             )
+#             print(f"BROWSER LAUNCHED FOR {zipcode}")
+#             context = await browser.new_context(
+#                 user_agent=(
+#                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+#                     "AppleWebKit/537.36 (KHTML, like Gecko) "
+#                     "Chrome/121.0.0.0 Safari/537.36"
+#                 )
+#             )
+#             page = await context.new_page()
+#             await page.goto("https://crimegrade.org/", timeout=60000)
+
+#             zip_input = page.get_by_placeholder("Zip code")
+#             await zip_input.click()
+#             await zip_input.fill(zipcode)
+
+#             await page.get_by_role("button", name="Explore").click()
+#             # await page.wait_for_timeout(2000)
+
+#             grade_el = (
+#                 page.locator("text=Overall Crime Grade™")
+#                 .locator("xpath=preceding-sibling::*[1]")
+#             )
+#             await grade_el.wait_for(state="visible", timeout=20000)
+#             grade = await grade_el.inner_text()
+#             grade = grade.strip()
+
+#             await browser.close()
+#             CRIME_DICT[zipcode] = grade
+#             print(f"Crime for {zipcode}: {grade}")
+#             return GRADE_TO_SCORE.get(grade, 0.0)
+
+#     except (PlaywrightTimeoutError, Exception) as e:
+#         print(f"Failed to get crime grade for {zipcode}: {e}")
+#         fallback_grade = "C+"  # default fallback
+#         CRIME_DICT[zipcode] = fallback_grade
+#         return GRADE_TO_SCORE.get(fallback_grade, 0.0)
+
+
+async def get_crime_score(zipcode: str, context) -> float:
+    # 1. Check Cache first
     if zipcode in CRIME_DICT:
-        print(f"CRIME SCORE FOUND FOR {zipcode}")
         return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
 
+    page = None
     try:
-        print(f"BUWEHFIHWEFHIUOWEFHEWIOUHFOWEIWEHF{zipcode}")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled"]
-            )
-            print(f"BROWSER LAUNCHED FOR {zipcode}")
-            context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/121.0.0.0 Safari/537.36"
-                )
-            )
-            page = await context.new_page()
-            await page.goto("https://crimegrade.org/", timeout=60000)
+        # 2. OPEN A NEW TAB (Lightweight)
+        # We use the context passed in, rather than launching a whole new browser
+        page = await context.new_page()
+        
+        # 3. YOUR EXISTING LOGIC
+        await page.goto("https://crimegrade.org/", timeout=60000)
 
-            zip_input = page.get_by_placeholder("Zip code")
-            await zip_input.click()
-            await zip_input.type(zipcode, delay=120)
+        # Optimization: Wait for selector to be ready before clicking
+        zip_input = page.get_by_placeholder("Zip code")
+        await zip_input.click()
+        await zip_input.fill(zipcode)
 
-            await page.get_by_role("button", name="Explore").click()
-            await page.wait_for_timeout(2000)
+        await page.get_by_role("button", name="Explore").click()
+        
+        # Wait for the result to appear
+        grade_el = (
+            page.locator("text=Overall Crime Grade™")
+            .locator("xpath=preceding-sibling::*[1]")
+        )
+        await grade_el.wait_for(state="visible", timeout=30000)
+        
+        grade = await grade_el.inner_text()
+        grade = grade.strip()
 
-            grade_el = (
-                page.locator("text=Overall Crime Grade™")
-                .locator("xpath=preceding-sibling::*[1]")
-            )
-            await grade_el.wait_for(state="visible", timeout=20000)
-            grade = await grade_el.inner_text()
-            grade = grade.strip()
+        # 4. CLOSE THE TAB (Free up RAM)
+        await page.close()
 
-            await browser.close()
-            CRIME_DICT[zipcode] = grade
-            print(f"Crime for {zipcode}: {grade}")
-            return GRADE_TO_SCORE.get(grade, 0.0)
+        CRIME_DICT[zipcode] = grade
+        print(f"✅ Crime for {zipcode}: {grade}")
+        return GRADE_TO_SCORE.get(grade, 0.0)
 
-    except (PlaywrightTimeoutError, Exception) as e:
-        print(f"Failed to get crime grade for {zipcode}: {e}")
-        fallback_grade = "C+"  # default fallback
-        CRIME_DICT[zipcode] = fallback_grade
-        return GRADE_TO_SCORE.get(fallback_grade, 0.0)
-
-
-
+    except Exception as e:
+        print(f"❌ Failed crime for {zipcode}: {e}")
+        # Always close page on error to prevent leaks
+        if page: await page.close()
+        
+        fallback = "C+"
+        CRIME_DICT[zipcode] = fallback
+        return GRADE_TO_SCORE.get(fallback, 0.0)
 
 
 def convert_address_to_location(address: str):
@@ -547,44 +589,66 @@ def get_gym(lat: float, lon: float) -> float:
 
 
 # @app.post("/updateAddress")
-async def get_address(request: Request):
-    data =  await request.json()
-    addresses=data.get("addresses")
+# async def get_address(request: Request):
+#     data =  await request.json()
+#     addresses=data.get("addresses")
 
-    final_results = []
-    for address in addresses:
-        tempDict = address
-        address_str = tempDict.get("address", "")
-        listing_price = tempDict.get("listing_price", "")
-        sqft = tempDict.get("sqft", "")
-        crime = tempDict.get("crime", "")
-        emprox = tempDict.get("emprox", "")
-        envwell = tempDict.get("envwell", "")
-        shop = tempDict.get("shop", "")
-        cafe = tempDict.get("cafe", "")
-        gym = tempDict.get("gym", "")
+#     final_results = []
+#     for address in addresses:
+#         tempDict = address
+#         address_str = tempDict.get("address", "")
+#         listing_price = tempDict.get("listing_price", "")
+#         sqft = tempDict.get("sqft", "")
+#         crime = tempDict.get("crime", "")
+#         emprox = tempDict.get("emprox", "")
+#         envwell = tempDict.get("envwell", "")
+#         shop = tempDict.get("shop", "")
+#         cafe = tempDict.get("cafe", "")
+#         gym = tempDict.get("gym", "")
 
-        zip_code, lat, lon = convert_address_to_location(address_str)
+#         zip_code, lat, lon = convert_address_to_location(address_str)
 
-        crime = await get_crime_score(zip_code)
-        # emprox = get_emergency_services(lat, lon)
-        # envwell = get_wellness_score(zip_code, lat, lon)
-        # shop = get_shops(lat, lon)
-        # cafe = get_cafes(lat, lon)
-        # gym = get_gym(lat, lon)
-        tempDict["crime"] = crime
-        # tempDict["emprox"] = emprox
-        # tempDict["envwell"] = envwell
-        # tempDict["shop"] = shop
-        # tempDict["cafe"] = cafe
-        # tempDict["gym"] = gym
-        final_results.append(tempDict)
-    message = {
-        "results": final_results
-    }
-    return JSONResponse(content=message)
+#         # crime = await get_crime_score(zip_code)
+#         crime = await get_crime_score(zip_code)
 
+#         # emprox = get_emergency_services(lat, lon)
+#         # envwell = get_wellness_score(zip_code, lat, lon)
+#         # shop = get_shops(lat, lon)
+#         # cafe = get_cafes(lat, lon)
+#         # gym = get_gym(lat, lon)
+#         tempDict["crime"] = crime
+#         # tempDict["emprox"] = emprox
+#         # tempDict["envwell"] = envwell
+#         # tempDict["shop"] = shop
+#         # tempDict["cafe"] = cafe
+#         # tempDict["gym"] = gym
+#         final_results.append(tempDict)
+#     message = {
+#         "results": final_results
+#     }
+#     return JSONResponse(content=message)
 
+# @app.post("/updateAddress")
+# async def get_address(request: Request):
+#     # ... (get your data and make lists) ...
+
+#     # --- LAUNCH BROWSER ONCE ---
+#     async with async_playwright() as p:
+#         browser = await p.chromium.launch(headless=True)
+        
+#         # Create the Context (Incognito window)
+#         context = await browser.new_context(
+#             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
+#         )
+
+#         # --- RUN TASKS IN PARALLEL ---
+#         # Notice we pass 'context' to the function now!
+#         crime_tasks = [get_crime_score(zip, context) for zip in zip_list]
+#         crime_results = await asyncio.gather(*crime_tasks)
+
+#         await browser.close()
+    
+#     # ... (assign crime_results to your addresses) ...
 
 @app.post("/updateAddress")
 async def multithreading(request: Request):
@@ -629,8 +693,24 @@ async def multithreading(request: Request):
         lat_list.append(lat)
         lon_list.append(lon)
         
-        crime = await get_crime_score(zip_code)
-        crime_list.append(crime)
+        # crime = await get_crime_score(zip_code)
+        # crime = get_crime_score(zip_code)
+        # crime_list.append(crime)
+        
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        
+        # Create the Context (Incognito window)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
+        )
+
+        # --- RUN TASKS IN PARALLEL ---
+        # Notice we pass 'context' to the function now!
+        crime_tasks = [get_crime_score(zip, context) for zip in zip_list]
+        crime_list = await asyncio.gather(*crime_tasks)
+
+        await browser.close()
         
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         # address_results = list(executor.map(get_crime_score, zip_list))
