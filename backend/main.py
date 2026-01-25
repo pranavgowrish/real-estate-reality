@@ -714,11 +714,19 @@ async def multithreading(request: Request):
         
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         # address_results = list(executor.map(get_crime_score, zip_list))
-        emprox_results = list(executor.map(get_emergency_services, lat_list, lon_list))
-        envwell_results = list(executor.map(get_wellness_score, zip_list, lat_list, lon_list))
-        shop_results = list(executor.map(get_shops, lat_list, lon_list))
-        cafe_results = list(executor.map(get_cafes, lat_list, lon_list))
-        gym_results = list(executor.map(get_gym, lat_list, lon_list))
+        
+        for i in range(len(addresses)):
+            emprox_results.append(executor.submit(get_emergency_services, lat_list[i], lon_list[i]))
+            envwell_results.append(executor.submit(get_wellness_score, zip_list[i], lat_list[i], lon_list[i]))
+            shop_results.append(executor.submit(get_shops, lat_list[i], lon_list[i]))
+            cafe_results.append(executor.submit(get_cafes, lat_list[i], lon_list[i]))
+            gym_results.append(executor.submit(get_gym, lat_list[i], lon_list[i]))
+        
+        # emprox_results = list(executor.map(get_emergency_services, lat_list, lon_list))
+        # envwell_results = list(executor.map(get_wellness_score, zip_list, lat_list, lon_list))
+        # shop_results = list(executor.map(get_shops, lat_list, lon_list))
+        # cafe_results = list(executor.map(get_cafes, lat_list, lon_list))
+        # gym_results = list(executor.map(get_gym, lat_list, lon_list))
         
         for i in range(len(emprox_results)):
             # final_results.append({"address": address_str[i], "listing_price": listing_price_list[i], "sqft": sqft_list[i], "crime": crime_list[i], "emprox": emprox_results[i], "envwell": envwell_results[i], "shop": shop_results[i], "cafe": cafe_results[i], "gym": gym_results[i]})
