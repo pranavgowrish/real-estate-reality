@@ -361,6 +361,161 @@ def get_emergency_services(zip_code: str, lat: float, lon: float) -> float:
 
     return score
 
+def shop_score(shops: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for shop in shops:
+        distance = haversine(shop["lat"], shop["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_shops(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["shop"="mall"](around:2000,{lat},{lon});
+        nwr["shop"="supermarket"](around:2000,{lat},{lon});
+        nwr["shop"="convenience"](around:2000,{lat},{lon});
+        nwr["shop"="shopping_centre"](around:2000,{lat},{lon});
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching shops:", e)
+        return -1
+    
+    shops = []
+
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            shops.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("shop", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+    print("Shops found:", shops)
+    score = shop_score(shops, lat, lon)
+    return score
+
+
+def cafe_score(cafes: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for cafe in cafes:
+        distance = haversine(cafe["lat"], cafe["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_cafes(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["amenity"="cafe"](around:3000,{lat},{lon});
+        nwr["amenity"="restaurant"](around:3000,{lat},{lon});
+        nwr["amenity"="fast_food"](around:3000,{lat},{lon});
+
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching cafes:", e)
+        return -1
+    
+    cafes = []
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            cafes.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("amenity", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+    print("Cafes found:", cafes)
+    score = cafe_score(cafes, lat, lon)
+    return score
+
+def gym_score(gyms: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for gym in gyms:
+        distance = haversine(gym["lat"], gym["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_gym(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["leisure"="fitness_centre"](around:4500,{lat},{lon});
+        nwr["leisure"="gym"](around:4500,{lat},{lon});
+        nwr["sport"="fitness"](around:4500,{lat},{lon});
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching gyms:", e)
+        return -1
+    
+    gyms = []
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            gyms.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("leisure", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+        
+    print("Gyms found:", gyms)
+    score = gym_score(gyms, lat, lon)
+    return score
+
 app.post("/updateAddress")
 def get_address(EXAMPLE_INPUT: dict):
     address = EXAMPLE_INPUT['address']
@@ -378,25 +533,32 @@ def get_address(EXAMPLE_INPUT: dict):
     crime = get_crime_score(zip)
     emprox = get_emergency_services(zip, lat, lon)
     envwell = get_wellness_score(zip, lat, lon)
+    shop = get_shops(lat, lon)
+    cafe = get_cafes(lat, lon)
+    gym = get_gym(lat, lon)
 
     print("Crime:", crime)
     print("Emprox:", emprox)
     print("Envwell:", envwell)
+    print("Shop:", shop)
+    print("Cafe:", cafe)
+    print("Gym:", gym)
 
     print("Address:", address)
 
 
 
-# if __name__ == '__main__': # For testing onlyyyy
-#     EXAMPLE_INPUT = {
-#         "address": "601 Matthew Ct, Braintree, MA 02184",
-#         "listing_price": "$560,000",
-#         "sqft": "1,493",
-#         "crime": "",
-#         "emprox": "",
-#         "envwell": "",
-#         "shop": "",
-#         "cafe": "",
-#         "gym": ""
-#     }
-#     get_address(EXAMPLE_INPUT)
+if __name__ == '__main__': # For testing onlyyyy
+    EXAMPLE_INPUT = {
+        "address": "601 Matthew Ct, Braintree, MA 02184",
+        "listing_price": "$560,000",
+        "sqft": "1,493",
+        "crime": "",
+        "emprox": "",
+        "envwell": "",
+        "shop": "",
+        "cafe": "",
+        "gym": ""
+    }
+    # 8276 Traveller St, Chino, CA 91708
+    get_address(EXAMPLE_INPUT)
