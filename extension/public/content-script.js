@@ -174,6 +174,7 @@ function updateLoader(msg, percent, done = false) {
       flex-direction:column;
       align-items:center;
       justify-content:center;
+      font-weight: bold;
       font-family: -apple-system, sans-serif;
     `;
 
@@ -182,7 +183,7 @@ function updateLoader(msg, percent, done = false) {
         <div id="loader-bar" style="
           height:100%;
           width:0%;
-          background:linear-gradient(90deg,#2563eb,#A8E9FF,#22c55e);
+          background:linear-gradient(90deg,#2563eb,#3897EB,#22c55e);
           border-radius:999px;
           transition:width 0.25s ease;
         "></div>
@@ -303,11 +304,9 @@ logo.style.cssText = `
     border-radius: 6px;
 `;
 logo.innerHTML = `
-    <h2 style="font-size: 18px; font-weight: 700; color: #111827; margin: 0; letter-spacing: -0.01em;">
-        Invest where it counts
-    </h2>
+
     <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Powered by Invest For Real</span>
+        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; font-family: -apple-system, sans-serif;">Powered by Invest For Real</span>
         <img src="${imageUrl}" style="height: 20px;" />
     </div>
 `;
