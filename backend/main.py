@@ -11,6 +11,14 @@ import pandas as pd
 import numpy as np
 import re
 import asyncio
+import threading
+import concurrent.futures
+
+# import sys
+
+# # ⚠️ PASTE THIS AT THE VERY TOP OF YOUR FILE
+# if sys.platform == 'win32':
+#     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = FastAPI()
 
@@ -24,7 +32,7 @@ app.add_middleware(
 
 last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
-EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EMAIL = "aqian152@gmail.com" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 EXAMPLE_INPUT= {
     "address": "8276 Traveller St, Chino, CA 91708",
@@ -229,15 +237,19 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
 
 
 async def get_crime_score(zipcode: str) -> float:
+    print(f"GETTING CRIME SCORE FOR {zipcode}")
     if zipcode in CRIME_DICT:
+        print(f"CRIME SCORE FOUND FOR {zipcode}")
         return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
 
     try:
+        print(f"BUWEHFIHWEFHIUOWEFHEWIOUHFOWEIWEHF{zipcode}")
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False,
                 args=["--disable-blink-features=AutomationControlled"]
             )
+            print(f"BROWSER LAUNCHED FOR {zipcode}")
             context = await browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -337,7 +349,7 @@ def convert_address_to_location(address: str):
 
 
 
-def get_emergency_services(zip_code: str, lat: float, lon: float) -> float:
+def get_emergency_services( lat: float, lon: float) -> float:
     overpass_query = f"""
     [out:json][timeout:25];
     (
@@ -533,7 +545,8 @@ def get_gym(lat: float, lon: float) -> float:
     score = gym_score(gyms, lat, lon)
     return score
 
-@app.post("/updateAddress")
+
+# @app.post("/updateAddress")
 async def get_address(request: Request):
     data =  await request.json()
     addresses=data.get("addresses")
@@ -554,20 +567,90 @@ async def get_address(request: Request):
         zip_code, lat, lon = convert_address_to_location(address_str)
 
         crime = await get_crime_score(zip_code)
-        emprox = get_emergency_services(zip_code, lat, lon)
-        envwell = get_wellness_score(zip_code, lat, lon)
-        shop = get_shops(lat, lon)
-        cafe = get_cafes(lat, lon)
-        gym = get_gym(lat, lon)
+        # emprox = get_emergency_services(lat, lon)
+        # envwell = get_wellness_score(zip_code, lat, lon)
+        # shop = get_shops(lat, lon)
+        # cafe = get_cafes(lat, lon)
+        # gym = get_gym(lat, lon)
         tempDict["crime"] = crime
-        tempDict["emprox"] = emprox
-        tempDict["envwell"] = envwell
-        tempDict["shop"] = shop
-        tempDict["cafe"] = cafe
-        tempDict["gym"] = gym
+        # tempDict["emprox"] = emprox
+        # tempDict["envwell"] = envwell
+        # tempDict["shop"] = shop
+        # tempDict["cafe"] = cafe
+        # tempDict["gym"] = gym
         final_results.append(tempDict)
     message = {
         "results": final_results
+    }
+    return JSONResponse(content=message)
+
+
+
+@app.post("/updateAddress")
+async def multithreading(request: Request):
+    data =  await request.json()
+    addresses=data.get("addresses")
+
+    final_results = []
+    
+    tempDict = addresses
+    
+    address_str = []
+    
+    # listing_price_list = []
+    # sqft_list = []
+    
+    crime_list = []
+    # emprox_list = []
+    # envwell_list = []
+    # shop_list = []
+    # cafe_list = []
+    # gym_list = []
+    zip_list = []
+    lat_list = []
+    lon_list = []
+    
+    
+    for address in addresses:
+        tempDict = address
+        # address_str.append(tempDict.get("address", ""))
+        # listing_price_list.append(tempDict.get("listing_price", ""))
+        # sqft_list.append(tempDict.get("sqft", ""))
+        
+        # # crime = tempDict.get("crime", "")
+        # emprox_list.append(tempDict.get("emprox", ""))
+        # envwell_list.append(tempDict.get("envwell", ""))
+        # shop_list.append(tempDict.get("shop", ""))
+        # cafe_list.append(tempDict.get("cafe", ""))
+        # gym_list.append(tempDict.get("gym", ""))
+        
+        zip_code, lat, lon = convert_address_to_location(tempDict.get("address", ""))
+        zip_list.append(zip_code)
+        lat_list.append(lat)
+        lon_list.append(lon)
+        
+        crime = await get_crime_score(zip_code)
+        crime_list.append(crime)
+        
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        # address_results = list(executor.map(get_crime_score, zip_list))
+        emprox_results = list(executor.map(get_emergency_services, lat_list, lon_list))
+        envwell_results = list(executor.map(get_wellness_score, zip_list, lat_list, lon_list))
+        shop_results = list(executor.map(get_shops, lat_list, lon_list))
+        cafe_results = list(executor.map(get_cafes, lat_list, lon_list))
+        gym_results = list(executor.map(get_gym, lat_list, lon_list))
+        
+        for i in range(len(emprox_results)):
+            # final_results.append({"address": address_str[i], "listing_price": listing_price_list[i], "sqft": sqft_list[i], "crime": crime_list[i], "emprox": emprox_results[i], "envwell": envwell_results[i], "shop": shop_results[i], "cafe": cafe_results[i], "gym": gym_results[i]})
+            addresses[i]["crime"] = crime_list[i]
+            addresses[i]["emprox"] = emprox_results[i]
+            addresses[i]["envwell"] = envwell_results[i]
+            addresses[i]["shop"] = shop_results[i]
+            addresses[i]["cafe"] = cafe_results[i]
+            addresses[i]["gym"] = gym_results[i]
+    
+    message = {
+        "results": addresses
     }
     return JSONResponse(content=message)
 
@@ -586,3 +669,7 @@ if __name__ == '__main__': # For testing onlyyyy
     # 8276 Traveller St, Chino, CA 91708
     #get_address(EXAMPLE_INPUT)
     asyncio.run(get_crime_score("02184"))
+    
+    
+    
+    
