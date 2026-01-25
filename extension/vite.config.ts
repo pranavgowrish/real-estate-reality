@@ -6,24 +6,24 @@ import { copyFileSync } from "fs";
 
 export default defineConfig({
   plugins: [
-    react(), 
+    react(),
     tailwindcss(),
     {
-      name: 'copy-manifest',
+      name: "copy-manifest",
       closeBundle() {
-        copyFileSync('public/manifest.json', 'dist/manifest.json');
-      }
-    }
+        copyFileSync("public/manifest.json", "dist/manifest.json");
+      },
+    },
   ],
   build: {
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'index.html')
+        index: resolve(__dirname, "index.html"),
       },
       output: {
-        entryFileNames: '[name].js',
-      }
+        entryFileNames: "[name].js",
+      },
     },
-    outDir: 'dist',
+    outDir: "dist",
   },
 });

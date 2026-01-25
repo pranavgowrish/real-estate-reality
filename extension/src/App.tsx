@@ -25,8 +25,12 @@ function App() {
       <div className="flex items-center gap-3 mb-4">
         <img src="/rer.png" alt="RER Logo" className="w-10 h-10" />
         <div>
-          <h1 className="text-2xl shadow-2xl tracking-[-0.02em] font-extrabold">Real Estate Reality</h1>
-          <p className="text-m shadow-2xl font-semibold text-[#006aff]">Safety & livability overview</p>
+          <h1 className="text-2xl shadow-2xl tracking-[-0.02em] font-extrabold">
+            Real Estate Reality
+          </h1>
+          <p className="text-m shadow-2xl font-semibold text-[#006aff]">
+            Safety & livability overview
+          </p>
         </div>
       </div>
 
@@ -93,13 +97,13 @@ function App() {
         {isConvenVisible && (
           <div className="space-y-2 w-4/5 pl-20" id="conven-details">
             <div className="">
-              <ConvenienceCard title="Restaurants: " conven={<RestaurantsPage />} />
+              <ConvenienceCard
+                title="Restaurants: "
+                conven={<RestaurantsPage />}
+              />
             </div>
             <div className="">
-              <ConvenienceCard
-                title="Shopping: "
-                conven={<ShoppingPage />}
-              />
+              <ConvenienceCard title="Shopping: " conven={<ShoppingPage />} />
             </div>
             <div className="">
               <ConvenienceCard title="Amenities: " conven={<AmenitiesPage />} />

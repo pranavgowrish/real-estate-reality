@@ -22,8 +22,20 @@ app.add_middleware(
 )
 
 last_nominatim_request = 0
-NOMINATIM_DELAY = 1.5
-EMAIL = "aqian152@gmail.com"
+NOMINATIM_DELAY = 1.0
+EMAIL = "test@gmail.com" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+EXAMPLE_INPUT= {
+    "address": "8276 Traveller St, Chino, CA 91708",
+    "listing_price": "$560,0003",
+    "sqft": "1,493",
+    "crime":"",
+    "emprox":"",
+    "envwell":"",
+    "shop":"",
+    "cafe":"",
+    "gym":""
+}
 
 CRIME_DICT = {}
 
