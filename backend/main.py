@@ -7,6 +7,7 @@ from math import radians, sin, cos, sqrt, atan2
 from playwright.sync_api import sync_playwright, TimeoutError
 import pandas as pd
 import numpy as np
+import re
 
 app = fastapi.FastAPI()
 
@@ -21,6 +22,20 @@ app.add_middleware(
 last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
 EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+EXAMPLE_INPUT= {
+    "address": "8276 Traveller St, Chino, CA 91708",
+    "listing_price": "$560,0003",
+    "sqft": "1,493",
+    "crime":"",
+    "emprox":"",
+    "envwell":"",
+    "shop":"",
+    "cafe":"",
+    "gym":""
+}
+
+CRIME_DICT = {}
 
 def convert_zipcode_to_latlon(zip_code: str):
     global last_nominatim_request
@@ -85,7 +100,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 
-def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
+def get_fire_score(lat, lon, csv_path='ca_fire_hazard.csv'):
     """
     Returns a safety score from 0-30 based on proximity to fire hazard centroids in ca_fire_hazard.csv.
     """
@@ -126,19 +141,7 @@ def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
     else:
         return 30
 
-def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
-    '''
-    data is gonna be the variable holding csv file backend/ca_city_avg_aqi.csv 
-    extract lat/long of address given and see how far that is from the address given and if its less than 50 miles, use that AQI value to score 
-    other approach: use geopy to get the distance between the address given and the city listed in the dataset
-
-    0 – 25	Pristine	30 pts	Best possible air (coastal/rural).
-    26 – 50	Good	25 pts	Safe, but has typical urban background levels.
-    51 – 100	Moderate	15 pts	Significant drop-off in "safety feel."
-    100+	Unhealthy	0 pts	Immediate safety concern.
-
-    return the total points
-    '''
+def get_aqi_score(lat, lon, csv_path='ca_city_avg_aqi.csv'):
     # 2. Load the AQI dataset
     df = pd.read_csv(csv_path)
 
@@ -180,12 +183,11 @@ def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
     return aqi_pts
 
 
-def get_wellness_score(zip_code):
+def get_wellness_score(zip_code, lat, lon):
     #add stuff in both get fire score and get aqi score
     # 1. Get the home coordinates
-    lat, lon, error = convert_zipcode_to_latlon(zip_code)
-    if error:
-        return {"error": f"Could not locate zip code: {error}"}
+    if lat is None or lon is None:
+        return {"error": "Invalid coordinates"}
 
     fire_score = get_fire_score(lat, lon)
     aqi_score = get_aqi_score(lat, lon)
@@ -224,6 +226,8 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
 
 
 def get_crime_score(zipcode: str) -> float:
+    if zipcode in CRIME_DICT:
+        return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -259,47 +263,69 @@ def get_crime_score(zipcode: str) -> float:
 
         browser.close()
         print(f"Grade: {grade}")
+        CRIME_DICT[zipcode] = grade
         return GRADE_TO_SCORE.get(grade, 0.0)
 
-    
-if __name__ == '__main__': # For testing onlyyyy
-    get_crime_score("92691")
+def convert_address_to_location(address: str):
+    url = "https://nominatim.openstreetmap.org/search"
+    headers = {
+        "User-Agent": "SafetyMap/1.0 (contact: {EMAIL})"
+    }
 
+    # First, try full address geocoding
+    params = {
+        "q": address + ", USA",
+        "format": "json",
+        "addressdetails": 1,
+        "limit": 3
+    }
 
-def convert_zipcode_to_latlon(zip_code: str):
-    global last_nominatim_request
-    headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
+    resp = requests.get(url, params=params, headers=headers, timeout=10)
 
-    # Rate limit Nominatim requests
-    elapsed = time.time() - last_nominatim_request
-    if elapsed < NOMINATIM_DELAY:
-        time.sleep(NOMINATIM_DELAY - elapsed)
-    
-    geo_res = requests.get(
-        f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
-        headers=headers
-    )
-    last_nominatim_request = time.time()
-    
     try:
-        geo_data = geo_res.json()
-    except Exception as e:
-        return None, None, f"Nominatim returned invalid JSON: {e}"
+        data = resp.json()
+    except Exception:
+        data = []
 
-    if not geo_data:
-        return None, None, "ZIP code not found"
+    # if geocoding failed
+    if not data:
+        # Try to extract ZIP from the address
+        zip_match = re.search(r"\b\d{5}(?:-\d{4})?\b", address)
+        zip_code = zip_match.group(0) if zip_match else None
 
-    lat = float(geo_data[0]["lat"])
-    lon = float(geo_data[0]["lon"])
-    return lat, lon, None
+        lat = lon = None
+
+        if zip_code:
+            # Try geocoding ZIP code itself
+            zip_params = {
+                "q": zip_code + ", USA",
+                "format": "json",
+                "limit": 1
+            }
+            zip_resp = requests.get(url, params=zip_params, headers=headers, timeout=10)
+            try:
+                zip_data = zip_resp.json()
+                if zip_data:
+                    lat = float(zip_data[0]["lat"])
+                    lon = float(zip_data[0]["lon"])
+            except Exception:
+                pass
+
+        print(f"No full address match. Using ZIP: {zip_code} -> Lat: {lat}, Lon: {lon}")
+        return zip_code, lat, lon
+
+    # Normal successful case
+    result = data[0]
+    lat = float(result["lat"])
+    lon = float(result["lon"])
+    zip_code = result.get("address", {}).get("postcode")
+
+    print(f"Geocoded Address: {address} -> ZIP: {zip_code}, Lat: {lat}, Lon: {lon}")
+    return zip_code, lat, lon
 
 
-@app.get("/api/emergency-services/{zip_code}")
-def get_emergency_services(zip_code: str):
-    # Zip code to longitude and latitude conversion
-    lat, lon, error = convert_zipcode_to_latlon(zip_code)
 
-    # Overpass query with 'out center' to get coordinates for ways
+def get_emergency_services(zip_code: str, lat: float, lon: float) -> float:
     overpass_query = f"""
     [out:json][timeout:25];
     (
@@ -318,7 +344,7 @@ def get_emergency_services(zip_code: str):
         overpass_res.raise_for_status()
         overpass_data = overpass_res.json()
     except Exception as e:
-        return {"services": [], "error": f"Overpass API error: {e}", "emergency_score": -1}
+        return -1
 
     services = []
     for el in overpass_data.get("elements", []):
@@ -337,16 +363,210 @@ def get_emergency_services(zip_code: str):
             })
     
     score = get_emergency_score(services, lat, lon)
+
+    return score
+
+def shop_score(shops: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for shop in shops:
+        distance = haversine(shop["lat"], shop["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_shops(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["shop"="mall"](around:2000,{lat},{lon});
+        nwr["shop"="supermarket"](around:2000,{lat},{lon});
+        nwr["shop"="convenience"](around:2000,{lat},{lon});
+        nwr["shop"="shopping_centre"](around:2000,{lat},{lon});
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching shops:", e)
+        return -1
     
-    return JSONResponse(content={
-        "services": services,
-        "emergency_score": score
-    })
+    shops = []
+
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            shops.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("shop", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+    print("Shops found:", shops)
+    score = shop_score(shops, lat, lon)
+    return score
 
 
-@app.get("/api/crime-score/{zip_code}")
-def api_get_crime_score(zip_code: str):
-    score = get_crime_score(zip_code)
-    return JSONResponse(content={
-        "crime_score": score
-    })
+def cafe_score(cafes: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for cafe in cafes:
+        distance = haversine(cafe["lat"], cafe["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_cafes(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["amenity"="cafe"](around:3000,{lat},{lon});
+        nwr["amenity"="restaurant"](around:3000,{lat},{lon});
+        nwr["amenity"="fast_food"](around:3000,{lat},{lon});
+
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching cafes:", e)
+        return -1
+    
+    cafes = []
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            cafes.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("amenity", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+    print("Cafes found:", cafes)
+    score = cafe_score(cafes, lat, lon)
+    return score
+
+def gym_score(gyms: list, lat: float, lon: float) -> float:
+    score = 0.0
+    for gym in gyms:
+        distance = haversine(gym["lat"], gym["lon"], lat, lon)
+        if distance <= 5:
+            score += 10.0
+        elif distance <= 15:
+            score += 5.0
+        else:
+            score += 2.0
+    return score
+
+def get_gym(lat: float, lon: float) -> float:
+    overpass_query = f"""
+        [out:json][timeout:25];
+        (
+        nwr["leisure"="fitness_centre"](around:4500,{lat},{lon});
+        nwr["leisure"="gym"](around:4500,{lat},{lon});
+        nwr["sport"="fitness"](around:4500,{lat},{lon});
+        );
+    out body center;
+    """
+
+    try:
+        overpass_res = requests.post("https://overpass-api.de/api/interpreter", data=overpass_query, timeout=30)
+        overpass_res.raise_for_status()
+        overpass_data = overpass_res.json()
+    except Exception as e:
+        print("Error fetching gyms:", e)
+        return -1
+    
+    gyms = []
+    for el in overpass_data.get("elements", []):
+        element_lat = el.get("lat") or el.get("center", {}).get("lat")
+        element_lon = el.get("lon") or el.get("center", {}).get("lon")
+        
+        if element_lat and element_lon:
+            gyms.append({
+                "id": str(el["id"]),
+                "name": el.get("tags", {}).get("name", "Unnamed"),
+                "type": el.get("tags", {}).get("leisure", "Unknown"),
+                "lat": float(element_lat),
+                "lon": float(element_lon),
+                "address": el.get("tags", {}).get("addr:full") or 
+                          f"{el.get('tags', {}).get('addr:street', '')} {el.get('tags', {}).get('addr:housenumber', '')}".strip() or None
+            })
+        
+    print("Gyms found:", gyms)
+    score = gym_score(gyms, lat, lon)
+    return score
+
+app.post("/updateAddress")
+def get_address(addresses: list):
+    final_results = []
+    for address in addresses:
+        tempDict = address
+        address_str = tempDict.get("address", "")
+        listing_price = tempDict.get("listing_price", "")
+        sqft = tempDict.get("sqft", "")
+        crime = tempDict.get("crime", "")
+        emprox = tempDict.get("emprox", "")
+        envwell = tempDict.get("envwell", "")
+        shop = tempDict.get("shop", "")
+        cafe = tempDict.get("cafe", "")
+        gym = tempDict.get("gym", "")
+
+        zip_code, lat, lon = convert_address_to_location(address_str)
+
+        crime = get_crime_score(zip_code)
+        emprox = get_emergency_services(zip_code, lat, lon)
+        envwell = get_wellness_score(zip_code, lat, lon)
+        shop = get_shops(lat, lon)
+        cafe = get_cafes(lat, lon)
+        gym = get_gym(lat, lon)
+        tempDict["crime"] = crime
+        tempDict["emprox"] = emprox
+        tempDict["envwell"] = envwell
+        tempDict["shop"] = shop
+        tempDict["cafe"] = cafe
+        tempDict["gym"] = gym
+        final_results.append(tempDict)
+    message = {
+        "results": final_results
+    }
+    return JSONResponse(content=message)
+
+if __name__ == '__main__': # For testing onlyyyy
+    EXAMPLE_INPUT = {
+        "address": "601 Matthew Ct, Braintree, MA 02184",
+        "listing_price": "$560,000",
+        "sqft": "1,493",
+        "crime": "",
+        "emprox": "",
+        "envwell": "",
+        "shop": "",
+        "cafe": "",
+        "gym": ""
+    }
+    # 8276 Traveller St, Chino, CA 91708
+    get_address(EXAMPLE_INPUT)
