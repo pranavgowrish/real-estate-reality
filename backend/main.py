@@ -59,7 +59,7 @@ def haversine(lat1, lon1, lat2, lon2):
     # 201-300: very unhealthy --> 0 pts
     # 301-500: hazardous --> 0 pts
 
-    # return the total points as a score out of 100 
+    # return the total points as a score out of 100
     
 
 
