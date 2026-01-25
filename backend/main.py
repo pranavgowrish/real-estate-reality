@@ -4,8 +4,7 @@ from fastapi.responses import JSONResponse
 import requests
 import time
 from math import radians, sin, cos, sqrt, atan2
-from playwright.sync_api 
-import sync_playwright, TimeoutError
+from playwright.sync_api import sync_playwright, TimeoutError
 import pandas as pd
 import numpy as np
 
