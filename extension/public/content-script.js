@@ -53,7 +53,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
     console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
     try {
-        const payload = { addresses: [propertyList[1]] }; 
+        const payload = { addresses: propertyList}; 
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -120,6 +120,36 @@ async function startApp() {
     if (!originalList) return; 
 
     injectStyles();
+
+    const imageUrl = chrome.runtime.getURL("rer.png");
+
+    if (!document.getElementById("ourlogoo")) {
+const logo = document.createElement("div");
+logo.id = "ourlogoo";
+logo.style.cssText = `
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 6px;
+`;
+logo.innerHTML = `
+    <h2 style="font-size: 18px; font-weight: 700; color: #111827; margin: 0; letter-spacing: -0.01em;">
+        Invest where it counts
+    </h2>
+    <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Powered by Invest For Real</span>
+        <img src="${imageUrl}" style="height: 20px;" />
+    </div>
+`;
+
+        const headtoadd = document.querySelector('h1[data-c11n-component="Heading"]');
+        if (headtoadd) {
+            headtoadd.parentNode.appendChild(logo);
+        }
+    }
 
     let allHTML = [];
     const firstPageItems = Array.from(document.querySelectorAll(LIST_ITEM_SEL));
@@ -313,7 +343,7 @@ async function startApp() {
 // --- PROPERTY PAGE LOGIC (DATA INJECTION) ---
 function startProperty() {
     console.log("🏠 Property Page Detected");
-    const selector = '[data-testid="home-details-chip-container"]';
+    const selector = '[data-testid="chip-personalize-payment-module"]';
 
     const injectPanel = () => {
         const targetBox = document.querySelector(selector);
@@ -342,7 +372,7 @@ function startProperty() {
         const makeGauge = (score, color, label, subtext) => {
             const radius = 35;
             const circumference = 2 * Math.PI * radius;
-            const offset = circumference - ((score / 100) * (circumference / 2)); // Only show half
+            const offset = circumference - ((Math.min(score,100) / 100) * (circumference / 2)); // Only show half
             
             return `
             <div style="display:flex; flex-direction:column; align-items:center; width: 100px;">
