@@ -24,7 +24,7 @@ app.add_middleware(
 
 last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
-EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EMAIL = "test@gmail.com" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 EXAMPLE_INPUT= {
     "address": "8276 Traveller St, Chino, CA 91708",
