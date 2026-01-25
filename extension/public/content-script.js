@@ -192,6 +192,7 @@ function updateLoader(msg, percent, done = false) {
       flex-direction:column;
       align-items:center;
       justify-content:center;
+      font-weight: bold;
       font-family: -apple-system, sans-serif;
     `;
 
@@ -200,7 +201,7 @@ function updateLoader(msg, percent, done = false) {
         <div id="loader-bar" style="
           height:100%;
           width:0%;
-          background:linear-gradient(90deg,#2563eb,#A8E9FF,#22c55e);
+          background:linear-gradient(90deg,#2563eb,#3897EB,#22c55e);
           border-radius:999px;
           transition:width 0.25s ease;
         "></div>
@@ -305,6 +306,45 @@ async function startApp() {
       }
     });
   }
+};
+
+// Run the interval to ensure it stays there
+const navTimer = setInterval(injectAfterResults, 1000);
+
+// --- SEARCH PAGE LOGIC ---
+async function startApp() {
+  const originalList = document.querySelector(LIST_CONTAINER_SEL);
+  if (!originalList) return;
+
+  injectStyles();
+
+    const imageUrl = chrome.runtime.getURL("rer.png");
+
+    if (!document.getElementById("ourlogoo")) {
+const logo = document.createElement("div");
+logo.id = "ourlogoo";
+logo.style.cssText = `
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 6px;
+`;
+logo.innerHTML = `
+
+    <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; font-family: -apple-system, sans-serif;">Powered by Invest For Real</span>
+        <img src="${imageUrl}" style="height: 20px;" />
+    </div>
+`;
+
+        const headtoadd = document.querySelector('h1[data-c11n-component="Heading"]');
+        if (headtoadd) {
+            headtoadd.parentNode.appendChild(logo);
+        }
+    }
   let allHTML = [];
   const firstPageItems = Array.from(document.querySelectorAll(LIST_ITEM_SEL));
   firstPageItems.forEach((item) => allHTML.push(item.outerHTML));
