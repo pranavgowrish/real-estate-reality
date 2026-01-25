@@ -1,4 +1,5 @@
 import EmergencyServicesPage from "./emergencyServices/page";
+import CrimeRiskPage from "./crimeRisk/page";
 import GradeCard from "./GradeCard";
 
 function App() {
@@ -15,7 +16,7 @@ function App() {
       </div>
 
       <div className="space-y-3">
-        <GradeCard title="Crime Risk: " grade="B+" /> 
+        <GradeCard title="Crime Risk: " grade={<CrimeRiskPage />} /> 
         {/* FIXXXXXX */}
 
         <GradeCard

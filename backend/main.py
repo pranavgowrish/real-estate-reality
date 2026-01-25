@@ -223,3 +223,11 @@ def get_emergency_services(zip_code: str):
         "services": services,
         "emergency_score": score
     })
+
+
+@app.get("/api/crime-score/{zip_code}")
+def api_get_crime_score(zip_code: str):
+    score = get_crime_score(zip_code)
+    return JSONResponse(content={
+        "crime_score": score
+    })
