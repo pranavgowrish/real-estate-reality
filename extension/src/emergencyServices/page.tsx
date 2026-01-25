@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 
 const ZIP_CODE = "91708"; // Hardcoded ZIP
 
-interface Service {
-  id: string;
-  name: string;
-  type: string;
-  lat: number;
-  lon: number;
-  address?: string;
-}
+// interface Service {
+//   id: string;
+//   name: string;
+//   type: string;
+//   lat: number;
+//   lon: number;
+//   address?: string;
+// }
 
 function EmergencyServicesPage() {
-  const [services, setServices] = useState<Service[]>([]);
+  // const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState(-1);
 
@@ -24,9 +24,9 @@ function EmergencyServicesPage() {
 
         if (data.error) {
           console.error(data.error);
-          setServices([]);
+          // setServices([]);
         } else {
-          setServices(data.services);
+          // setServices(data.services);
           setScore(data.emergency_score);
         }
       } catch (err) {
@@ -43,7 +43,7 @@ function EmergencyServicesPage() {
 
   return (
     <div>
-      <h1>Emergency Services Near {ZIP_CODE}</h1>
+      {/* <h1>Emergency Services Near {ZIP_CODE}</h1>
       {services.length === 0 && <p>No emergency services found nearby.</p>}
       <ul>
         {services.map((s) => (
@@ -57,7 +57,8 @@ function EmergencyServicesPage() {
         <li>
             <strong>Emergency Score:</strong> {score >= 0 ? score.toFixed(2) : "N/A"}
         </li>
-      </ul>
+      </ul> */}
+      {score >= 0 ? score.toFixed(2) : "N/A"}
     </div>
   );
 }
