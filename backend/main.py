@@ -1,15 +1,18 @@
-import fastapi
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import requests
 import time
 from math import radians, sin, cos, sqrt, atan2
 from playwright.sync_api import sync_playwright, TimeoutError
+from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 import pandas as pd
 import numpy as np
 import re
+import asyncio
 
-app = fastapi.FastAPI()
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -225,46 +228,55 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
     return score
 
 
-def get_crime_score(zipcode: str) -> float:
+async def get_crime_score(zipcode: str) -> float:
     if zipcode in CRIME_DICT:
         return GRADE_TO_SCORE.get(CRIME_DICT[zipcode], 0.0)
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
-        )
 
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/121.0.0.0 Safari/537.36"
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"]
             )
-        )
+            context = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0.0.0 Safari/537.36"
+                )
+            )
+            page = await context.new_page()
+            await page.goto("https://crimegrade.org/", timeout=60000)
 
-        page = context.new_page()
-        page.goto("https://crimegrade.org/", timeout=60000)
+            zip_input = page.get_by_placeholder("Zip code")
+            await zip_input.click()
+            await zip_input.type(zipcode, delay=120)
 
-        zip_input = page.get_by_placeholder("Zip code")
-        zip_input.click()
-        zip_input.type(zipcode, delay=120)
+            await page.get_by_role("button", name="Explore").click()
+            await page.wait_for_timeout(2000)
 
-        page.get_by_role("button", name="Explore").click()
+            grade_el = (
+                page.locator("text=Overall Crime Grade™")
+                .locator("xpath=preceding-sibling::*[1]")
+            )
+            await grade_el.wait_for(state="visible", timeout=20000)
+            grade = await grade_el.inner_text()
+            grade = grade.strip()
 
-        page.wait_for_timeout(2000)
+            await browser.close()
+            CRIME_DICT[zipcode] = grade
+            print(f"Crime for {zipcode}: {grade}")
+            return GRADE_TO_SCORE.get(grade, 0.0)
 
-        grade_el = (
-            page.locator("text=Overall Crime Grade™")
-            .locator("xpath=preceding-sibling::*[1]")
-        )
+    except (PlaywrightTimeoutError, Exception) as e:
+        print(f"Failed to get crime grade for {zipcode}: {e}")
+        fallback_grade = "C+"  # default fallback
+        CRIME_DICT[zipcode] = fallback_grade
+        return GRADE_TO_SCORE.get(fallback_grade, 0.0)
 
-        grade_el.wait_for(state="visible", timeout=20000)
-        grade = grade_el.inner_text().strip()
 
-        browser.close()
-        print(f"Grade: {grade}")
-        CRIME_DICT[zipcode] = grade
-        return GRADE_TO_SCORE.get(grade, 0.0)
+
+
 
 def convert_address_to_location(address: str):
     url = "https://nominatim.openstreetmap.org/search"
@@ -521,8 +533,11 @@ def get_gym(lat: float, lon: float) -> float:
     score = gym_score(gyms, lat, lon)
     return score
 
-app.post("/updateAddress")
-def get_address(addresses: list):
+@app.post("/updateAddress")
+async def get_address(request: Request):
+    data =  await request.json()
+    addresses=data.get("addresses")
+
     final_results = []
     for address in addresses:
         tempDict = address
@@ -538,7 +553,7 @@ def get_address(addresses: list):
 
         zip_code, lat, lon = convert_address_to_location(address_str)
 
-        crime = get_crime_score(zip_code)
+        crime = await get_crime_score(zip_code)
         emprox = get_emergency_services(zip_code, lat, lon)
         envwell = get_wellness_score(zip_code, lat, lon)
         shop = get_shops(lat, lon)
@@ -569,4 +584,5 @@ if __name__ == '__main__': # For testing onlyyyy
         "gym": ""
     }
     # 8276 Traveller St, Chino, CA 91708
-    get_address(EXAMPLE_INPUT)
+    #get_address(EXAMPLE_INPUT)
+    asyncio.run(get_crime_score("02184"))
