@@ -53,7 +53,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
     console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
     try {
-        const payload = { addresses: propertyList}; 
+        const payload = { addresses: [propertyList[0]]}; 
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -97,23 +97,14 @@ function getInvestmentScore(roi_list, safety_list, convenience_list) {
     return investment_scores;
 }
 
-// --- LOADER UI ---
-// function updateLoader(msg, percent) {
-//     let loader = document.getElementById('zillow-loader');
-//     if (!loader) {
-//         const container = document.getElementById('search-page-list-container');
-//         if(!container) return;
-//         container.style.position = 'relative';
-//         loader = document.createElement('div');
-//         loader.id = 'zillow-loader';
-//         loader.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; color: #374151;`;
-//         loader.innerHTML = `<div style="width: 150px; height: 6px; background: #e5e7eb; border-radius: 99px;"><div id="loader-bar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.3s; border-radius: 99px;"></div></div><div id="loader-text" style="font-size: 13px; margin-top: 10px;">Starting...</div>`;
-//         container.appendChild(loader);
-//     }
-//     document.getElementById('loader-bar').style.width = percent + '%';
-//     document.getElementById('loader-text').innerText = msg;
-// }
+function insertWithTopSpacing(parent, newNode, referenceNode, spacingPx = 24) {
+    const spacer = document.createElement('div');
+    spacer.style.height = spacingPx + 'px';
+    spacer.style.width = '100%';
 
+    parent.insertBefore(spacer, referenceNode);
+    parent.insertBefore(newNode, referenceNode);
+}
 // --- LOADER UI (SMOOTH + CAPPED) ---
 let displayedProgress = 0;
 let targetProgress = 0;
@@ -405,17 +396,30 @@ logo.innerHTML = `
                 </div>
             </div>`;
         
+        rightCol.style.cssText = `
+            width: 50%; 
+            padding: 30px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            position: relative;
+            font-family: -apple-system, sans-serif;            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            
+        `;
+
         row.appendChild(leftCol);
         row.appendChild(rightCol);
         container.appendChild(row);
     });
 
-    originalList.parentNode.insertBefore(container, originalList);
+    insertWithTopSpacing(originalList.parentNode, container, originalList, 32);
+    
     const loader = document.getElementById('zillow-loader');
     if(loader) loader.remove();
 }
 
-// --- PROPERTY PAGE LOGIC (DATA INJECTION) ---
 // --- PROPERTY PAGE LOGIC (DATA INJECTION) ---
 function startProperty() {
     console.log("🏠 Property Page Detected");
@@ -486,7 +490,7 @@ function startProperty() {
             // Combine into paragraphs
             let html = "";
             if (pros.length > 0) html += `<div style="margin-bottom:8px;"><b>Investment Worth:</b> ${pros.join(" ")}</div>`;
-            if (cons.length > 0) html += `<div>⚠️ <b>Risks to watch:</b> ${cons.join(" ")}</div>`;
+            if (cons.length > 0) html += `<div><b>Risks to watch:</b> ${cons.join(" ")}</div>`;
             
             if (!html) html = "This property shows average metrics across the board. It is a stable but standard investment choice.";
             
@@ -499,15 +503,16 @@ function startProperty() {
 
             hello.innerHTML = `
                 <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 20px;">
-                    <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 5px;">AI Investment Report</div>
+
+                    <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 5px;">Real Estate Reality: Investment Report</div>
                     <div style="font-size: 13px; color: #6b7280;">Analysis based on rent, crime, and lifestyle data.</div>
                 </div>
 
                 <div style="display: flex; justify-content: space-around; align-items: flex-end; margin-bottom: 25px;">
-                    ${makeGauge(d.finalScore, scoreColor, "Investment", "Overall Score")}
+                    ${makeGauge(Math.min(d.finalScore, 100), scoreColor, "Investment", "Overall Score")}
                     ${makeGauge(Math.min(d.calculatedROI * 10, 100), "#10b981", "Yield", `${d.calculatedROI.toFixed(2)}% ROI`)}
-                    ${makeGauge(d.crime, "#3b82f6", "Safety", "Crime Index")}
-                    ${makeGauge(d.shop, "#8b5cf6", "Convenience", "Walkability")}
+                    ${makeGauge(Math.min(d.crime, 100), "#3b82f6", "Safety", "Crime Index")}
+                    ${makeGauge(Math.min(d.shop, 100), "#8b5cf6", "Convenience", "Walkability")}
                 </div>
 
                 <div style="background: #f9fafb; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #374151; border-left: 4px solid ${scoreColor};">
@@ -516,18 +521,39 @@ function startProperty() {
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
                     <div>
-                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">Financials</div>
-                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span>Est. Rent:</span> <span style="font-weight: 700;">$${d.rentZestimate ? d.rentZestimate.toLocaleString() : 'N/A'}</span>
+                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">Safety</div>
+                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
+                            <span>Crime rate:</span> <span style="font-weight: 700;">${Math.min(d.crime, 100)}</span>
                         </div>
                         <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
-                            <span>List Price:</span> <span style="font-weight: 700;">$${d.purchasePrice ? d.purchasePrice.toLocaleString() : 'N/A'}</span>
+                            <span>Emergency services proximity score:</span> <span style="font-weight: 700;">${Math.min(d.emprox, 100)}</span>
                         </div>
+                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
+                            <span>Wellness score:</span> <span style="font-weight: 700;">${Math.min(d.envwell, 100)}</span>
+                        </div>
+                        
                     </div>
                     <div>
-                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">Location</div>
-                        <div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">• ${d.emprox > 80 ? 'Rapid EMS Response' : 'Avg EMS Response'}</div>
-                        <div style="font-size: 13px; color: #4b5563;">• ${d.envwell > 80 ? 'High Air Quality' : 'Avg Air Quality'}</div>
+                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-bottom: 8px;">Location</div>
+                        <div style="font-size: 13px; color: #4b5563;">• ${d.emprox > 80 ? 'Rapid EMS Response' : 'Avg EMS Response'}</div>
+                        <div style="font-size: 13px; color: #4b5563;">
+                        • ${
+                            d.envwell >= 80 
+                                ? 'High Air Quality' 
+                                : d.envwell >= 50 
+                                    ? 'Moderate Air Quality' 
+                                    : 'Poor Air Quality'
+                            }
+                        </div>
+                        <div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">
+                            • ${
+                                (0.9 * (d.gym + d.cafe + d.shop)) > 270
+                                ? 'Many amenities nearby (gyms, cafes, shops)'
+                                : (0.9 * (d.gym + d.cafe + d.shop)) > 180
+                                    ? 'Mediocre amount of amenities nearby'
+                                    : 'Poor amount of amenities nearby'
+                            }
+                        </div>
                     </div>
                 </div>
             `;
@@ -542,12 +568,13 @@ function startProperty() {
             `;
         }
 
-        targetBox.parentNode.insertBefore(hello, targetBox);
+        insertWithTopSpacing(targetBox.parentNode, hello, targetBox, 24);
     };
 
     injectPanel();
     setInterval(injectPanel, 1000);
 }
+
 
 startApp();
 
