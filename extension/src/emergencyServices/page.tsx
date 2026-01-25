@@ -41,7 +41,7 @@ function EmergencyServicesPage() {
     fetchServices();
   }, []);
 
-  if (loading) return <p>Loading emergency services...</p>;
+  if (loading) return <p>Loading...</p>;
 
   return (
     <div>
