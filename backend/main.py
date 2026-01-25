@@ -21,6 +21,33 @@ last_nominatim_request = 0
 NOMINATIM_DELAY = 1.0
 EMAIL = "ENTER YOUR EMAIL HERE!!!!!!!!!!!" # ENTER YOUR EMAIL HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+def convert_zipcode_to_latlon(zip_code: str):
+    global last_nominatim_request
+    headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
+
+    # Rate limit Nominatim requests
+    elapsed = time.time() - last_nominatim_request
+    if elapsed < NOMINATIM_DELAY:
+        time.sleep(NOMINATIM_DELAY - elapsed)
+    
+    geo_res = requests.get(
+        f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
+        headers=headers
+    )
+    last_nominatim_request = time.time()
+    
+    try:
+        geo_data = geo_res.json()
+    except Exception as e:
+        return None, None, f"Nominatim returned invalid JSON: {e}"
+
+    if not geo_data:
+        return None, None, "ZIP code not found"
+
+    lat = float(geo_data[0]["lat"])
+    lon = float(geo_data[0]["lon"])
+    return lat, lon, None
+
 
 def haversine(lat1, lon1, lat2, lon2):
 
@@ -35,8 +62,61 @@ def haversine(lat1, lon1, lat2, lon2):
     distance = R * c
     return distance
 
+def get_wellness_score(zip_code):
+    #add stuff in both get fire score and get aqi score
+    # 1. Get the home coordinates
+    lat, lon, error = convert_zipcode_to_latlon(zip_code)
+    if error:
+        return {"error": f"Could not locate zip code: {error}"}
 
-def get_wellness_score(zip_code, csv_path='backend/ca_city_avg_aqi.csv'):
+    fire_score = get_fire_score(lat, lon)
+    aqi_score = get_aqi_score(lat, lon)
+    total_score = fire_score + aqi_score
+    return total_score
+
+def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
+    """
+    Returns a safety score from 0-30 based on proximity to fire hazard centroids in ca_fire_hazard.csv.
+    """
+    # 2. Load the CSV
+    try:
+        df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        return 30 # Default to safe if data is missing
+
+    min_dist_miles = float('inf')
+    nearest_class = 0
+
+    # Threshold: Fire hazard zones are local. 
+    # 5 miles accounts for the distance to the center of a zone.
+    MAX_DIST_MILES = 5.0
+
+    # 3. Iterate and find the closest hazard centroid
+    for _, row in df.iterrows():
+        dist_km = haversine(lat, lon, row['lat'], row['lng'])
+        dist_miles = dist_km * 0.621371
+        
+        if dist_miles < min_dist_miles:
+            min_dist_miles = dist_miles
+            nearest_class = row['HAZ_CLASS']
+
+    # 4. Scoring Logic
+    # If the closest centroid is too far away, it's considered Urban/Safe
+    if min_dist_miles > MAX_DIST_MILES:
+        return 30
+
+    # Points based on the CAL FIRE Severity Classes
+    if nearest_class == 3:   # Very High
+        return 0
+    elif nearest_class == 2: # High
+        return 10
+    elif nearest_class == 1: # Moderate
+        return 20
+    else:
+        return 30
+
+
+def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
     '''
     data is gonna be the variable holding csv file backend/ca_city_avg_aqi.csv 
     extract lat/long of address given and see how far that is from the address given and if its less than 50 miles, use that AQI value to score 
@@ -49,13 +129,6 @@ def get_wellness_score(zip_code, csv_path='backend/ca_city_avg_aqi.csv'):
 
     return the total points
     '''
-
-    # 1. Convert home zip to coordinates
-    home_lat, home_lon, error = convert_zipcode_to_latlon(zip_code)
-    
-    if error:
-        return {"error": f"Could not locate zip code: {error}"}
-
     # 2. Load the AQI dataset
     df = pd.read_csv(csv_path)
 
@@ -65,7 +138,7 @@ def get_wellness_score(zip_code, csv_path='backend/ca_city_avg_aqi.csv'):
 
     for _, row in df.iterrows():
         # Note: dataset uses 'lng', haversine expects lon
-        dist = haversine(home_lat, home_lon, row['lat'], row['lng'])
+        dist = haversine(lat, lon, row['lat'], row['lng'])
         
         if dist < min_dist_km:
             min_dist_km = dist
@@ -84,17 +157,17 @@ def get_wellness_score(zip_code, csv_path='backend/ca_city_avg_aqi.csv'):
     # 6. Apply point scoring logic
     # 0-50: 30 pts | 51-100: 25 pts | 101-150: 20 pts | 151-200: 5 pts | 201+: 0 pts
     if aqi_value <= 50:
-        points = 30
+        aqi_pts = 30
     elif aqi_value <= 100:
-        points = 25
+        aqi_pts = 25
     elif aqi_value <= 150:
-        points = 20
+        aqi_pts = 20
     elif aqi_value <= 200:
-        points = 5
+        aqi_pts = 5
     else:
-        points = 0
+        aqi_pts = 0
 
-    return points
+    return aqi_pts
 
 
 def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
@@ -125,33 +198,6 @@ def get_emergency_score(services: list, ogLat: float, ogLon: float) -> float:
             else:
                 score += 1.0
     return score
-
-def convert_zipcode_to_latlon(zip_code: str):
-    global last_nominatim_request
-    headers = {f"User-Agent": "EmergencyServicesApp/1.0 ({EMAIL})"}
-
-    # Rate limit Nominatim requests
-    elapsed = time.time() - last_nominatim_request
-    if elapsed < NOMINATIM_DELAY:
-        time.sleep(NOMINATIM_DELAY - elapsed)
-    
-    geo_res = requests.get(
-        f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json",
-        headers=headers
-    )
-    last_nominatim_request = time.time()
-    
-    try:
-        geo_data = geo_res.json()
-    except Exception as e:
-        return None, None, f"Nominatim returned invalid JSON: {e}"
-
-    if not geo_data:
-        return None, None, "ZIP code not found"
-
-    lat = float(geo_data[0]["lat"])
-    lon = float(geo_data[0]["lon"])
-    return lat, lon, None
 
 
 @app.get("/api/emergency-services/{zip_code}")
