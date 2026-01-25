@@ -127,18 +127,6 @@ def get_fire_score(lat, lon, csv_path='backend/ca_fire_hazard.csv'):
         return 30
 
 def get_aqi_score(lat, lon, csv_path='backend/ca_city_avg_aqi.csv'):
-    '''
-    data is gonna be the variable holding csv file backend/ca_city_avg_aqi.csv 
-    extract lat/long of address given and see how far that is from the address given and if its less than 50 miles, use that AQI value to score 
-    other approach: use geopy to get the distance between the address given and the city listed in the dataset
-
-    0 – 25	Pristine	30 pts	Best possible air (coastal/rural).
-    26 – 50	Good	25 pts	Safe, but has typical urban background levels.
-    51 – 100	Moderate	15 pts	Significant drop-off in "safety feel."
-    100+	Unhealthy	0 pts	Immediate safety concern.
-
-    return the total points
-    '''
     # 2. Load the AQI dataset
     df = pd.read_csv(csv_path)
 
