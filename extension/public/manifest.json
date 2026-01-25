@@ -5,15 +5,15 @@
   "action": {
     "default_popup": "index.html"
   },
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "tabs", "webNavigation","declarativeContent"],
   "content_scripts": [
     {
       "matches": ["https://www.zillow.com/*"],
       "js": ["content-script.js"]
     }
   ],
-
-  "host_permissions": ["http://*/*", "https://*/*"],
+  
+  "host_permissions": ["http://*/*", "https://*/*", "http://127.0.0.1:8000/*"],
   "icons": {
     "32": "rer.png"
   }

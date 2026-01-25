@@ -5,10 +5,10 @@ interface GradeCardProps {
 
 function GradeCard(props: GradeCardProps) {
   return (
-    <div className="bg-white rounded-xl shadow-2xl p-4 border-2 border-pink-200 text-gray-700 ">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-700">{props.title}</p>
-        <span className="text-xl font-bold">{props.grade}</span>
+    <div className="rounded-xl shadow-2xl p-4 border-[3.6px] font-semibold border-[#006aff]">
+      <div className="flex items-center font-bold justify-between">
+        <p className="text-base font-bold ">{props.title}</p>
+        <span className="text-lg font-extrabold ">{props.grade}</span>
       </div>
     </div>
   );
