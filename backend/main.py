@@ -707,6 +707,7 @@ async def multithreading(request: Request):
         lat_list.append(lat)
         lon_list.append(lon)
         
+        #comments
     
     # crime = await get_crime_score(zip_code)
         # crime = get_crime_score(zip_code)
