@@ -1,10 +1,11 @@
-console.log('--- Super Sorter v30: Capped Scoring Edition ---');
+console.log('--- Super Sorter v31: Property Page Data Injection ---');
 
 // --- CONFIGURATION ---
 const API_URL = "http://127.0.0.1:8000/updateAddress"; 
 const MAX_PAGES_TO_FETCH = 1;
 const DELAY_BETWEEN_PAGES = 1500; 
 const TOP_TIER_COUNT = 3; 
+const STORAGE_KEY = 'all_data';
 
 const LIST_CONTAINER_SEL = 'ul[data-c11n-component="List.Root"]';
 const LIST_ITEM_SEL = 'li[data-c11n-component="List.Item"]';
@@ -52,7 +53,7 @@ async function fetchMarketPrices(urls) {
 const fetchBatchAnalysis = async (propertyList) => {
     console.log(`📡 API: Sending ${propertyList.length} items to backend...`);
     try {
-        const payload = { addresses: propertyList }; 
+        const payload = { addresses: [propertyList[1]] }; 
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -60,7 +61,6 @@ const fetchBatchAnalysis = async (propertyList) => {
         });
         if (!response.ok) throw new Error("API Error");
         const data = await response.json();
-        console.log("Backend Data:", data);
         return data.results || data; 
     } catch (error) {
         console.warn("Backend failed. Using fallback.");
@@ -69,47 +69,29 @@ const fetchBatchAnalysis = async (propertyList) => {
 };
 
 // --- MATH & SCORING HELPERS ---
-
 function getROI(rent, purchase_price) {
     if (!rent || !purchase_price) return 0;
     const annual_income = rent * 12;
     const annual_expenses = (purchase_price * 0.0125) + 2000 + (rent * 0.1 * 12);
     const roi = (annual_income - annual_expenses) / purchase_price;
-    console.log(`Calculated ROI: ${(roi * 100).toFixed(2)}% for rent $${rent} and price $${purchase_price}`);
     return roi * 100; 
 }
 
-// 1. Cap ROI at 15% so it doesn't break the scale
 function normalizeROI(list) {
-    return list.map(item => {
-        // If ROI is > 15%, treat it as 1.0 (perfect score)
-        // If ROI is < 0%, treat it as 0.0
-        const capped = Math.min(Math.max(item, 0), 15);
-        return capped / 15;
-    });
+    return list.map(item => Math.min(Math.max(item, 0), 15) / 15);
 }
 
-// 2. Cap Scores at 100 so raw values don't inflate the average
 function normalize(list) {
-    return list.map(item => {
-        // Cap value at 100 max, 0 min
-        const capped = Math.min(Math.max(item, 0), 100); 
-        return capped / 100; // Returns 0.0 - 1.0
-    });
+    return list.map(item => Math.min(Math.max(item, 0), 100) / 100);
 }
 
 function getInvestmentScore(roi_list, safety_list, convenience_list) {
     const normalized_roi = normalizeROI(roi_list);
     const normalized_safety = normalize(safety_list);
     const normalized_convenience = normalize(convenience_list);
-    
     const investment_scores = [];
     for(let i = 0; i < roi_list.length; i++) {
-        // Weighted Average: 33% ROI, 33% Safety, 33% Convenience
-        // Since inputs are capped 0.0-1.0, the sum cannot exceed 1.0
-        const score = (normalized_roi[i] * (1/3)) + 
-                      (normalized_safety[i] * (1/3)) + 
-                      (normalized_convenience[i] * (1/3));
+        const score = (normalized_roi[i] * (1/3)) + (normalized_safety[i] * (1/3)) + (normalized_convenience[i] * (1/3));
         investment_scores.push(score);
     }
     return investment_scores;
@@ -132,14 +114,13 @@ function updateLoader(msg, percent) {
     document.getElementById('loader-text').innerText = msg;
 }
 
-// --- MAIN SEARCH LOGIC ---
+// --- SEARCH PAGE LOGIC ---
 async function startApp() {
     const originalList = document.querySelector(LIST_CONTAINER_SEL);
     if (!originalList) return; 
 
     injectStyles();
 
-    // 1. CRAWL HTML
     let allHTML = [];
     const firstPageItems = Array.from(document.querySelectorAll(LIST_ITEM_SEL));
     firstPageItems.forEach(item => allHTML.push(item.outerHTML));
@@ -160,7 +141,6 @@ async function startApp() {
         } catch(e) { break; }
     }
 
-    // 2. PARSE HTML
     updateLoader(`Parsing ${allHTML.length} Properties...`, 50);
     let scrapeQueue = [];   
     let scrapeUrls = [];    
@@ -176,8 +156,7 @@ async function startApp() {
         if (rawText.includes("Loading") || rawText.length < 20 || !rawText.includes('$')) continue;
 
         const address = (rawText.match(/(?:^|\n)(.*?, [A-Z]{2} \d{5})/) || [])[1]?.trim() || "Unknown";
-        // Fixed Regex for Price (stops at 3 digits after comma)
-        const priceStr = (rawText.match(/\$[0-9]{1,3}(?:,[0-9]{3})*/) || ["0"])[0];
+        const priceStr = (rawText.match(/\$[0-9]{1,3}(?:,[0-9]{3})*/) || ["0"])[0];        
         const sqftStr = (rawText.match(/([0-9,]+)\s+sqft/) || [null, "N/A"])[1];
         
         const linkEl = el.querySelector('a[data-test="property-card-link"]') || el.querySelector('a');
@@ -192,7 +171,6 @@ async function startApp() {
 
     if (scrapeQueue.length === 0) { updateLoader("No properties found.", 100); return; }
 
-    // 3. FETCH DATA (API + RENT)
     updateLoader(`Analyzing ${scrapeQueue.length} items...`, 60);
     
     const [apiResults, rentResults] = await Promise.all([
@@ -200,7 +178,6 @@ async function startApp() {
         fetchMarketPrices(scrapeUrls)    
     ]);
 
-    // 4. PREPARE LISTS FOR SCORING
     let roiList = [];
     let safetyList = [];
     let convenienceList = [];
@@ -209,38 +186,33 @@ async function startApp() {
         const backendData = apiResults[index] || item;
         const rentZestimate = rentResults[index];
         const purchasePrice = parseInt(item.listing_price.replace(/[\$,]/g, '')) || 0;
-
-        // Calculate raw ROI
         const calculatedROI = getROI(rentZestimate, purchasePrice);
 
-        // Calculate Sub-scores
         const safetyTotal = (backendData.crime||0) + (backendData.emprox||0) + (backendData.envwell||0);
         const lifestyleTotal = (backendData.shop||0) + (backendData.cafe||0) + (backendData.gym||0);
         
         const avgSafety = safetyTotal / 3;
         const avgLife = lifestyleTotal / 3;
 
-        // Push to lists for vector normalization
         roiList.push(calculatedROI);
         safetyList.push(avgSafety);
         convenienceList.push(avgLife);
 
         return {
             element: domElements[index],
-            data: { ...backendData, rentZestimate, purchasePrice, calculatedROI },
+            data: { ...backendData, address: item.address, rentZestimate, purchasePrice, calculatedROI }, // Ensure address is saved
             rawMetrics: { avgSafety, avgLife }
         };
     });
 
-    // 5. CALCULATE FINAL INVESTMENT SCORE
     const investmentScores = getInvestmentScore(roiList, safetyList, convenienceList);
 
-    // Second Pass: Assign Scores and Build UI Object
     let finalItems = mergedData.map((item, index) => {
-        // Final score 0-100
         const finalScore = Math.floor(investmentScores[index] * 100);
-        
         let badgeColor = finalScore >= 85 ? '#10b981' : (finalScore >= 70 ? '#3b82f6' : '#f59e0b');
+
+        // IMPORTANT: We explicitly save the 'finalScore' into the data object so we can read it on the detail page later
+        item.data.finalScore = finalScore; 
 
         return {
             ...item,
@@ -254,17 +226,17 @@ async function startApp() {
         };
     });
 
-    // Sort by Investment Score
     finalItems.sort((a, b) => b.ui.score - a.ui.score);
 
-    // Apply Glow to Top Tier
+    // Save to Local Storage for use in Property Page
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems.map(i => i.data)));
+
     finalItems.forEach((item, index) => {
         if (index < TOP_TIER_COUNT) {
             item.ui.cssClass = item.ui.avgSafety > item.ui.avgLife ? "glow-green" : "glow-gold";
         }
     });
 
-    // 6. RENDER UI
     updateLoader("Rendering...", 90);
     originalList.style.display = 'none';
     const existing = document.getElementById("custom-row-container");
@@ -300,9 +272,8 @@ async function startApp() {
             <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: ${ui.badgeColor};"></div>
             <div style="margin-left: 15px; height: 100%; display: flex; flex-direction: column; justify-content: space-evenly;">
                 <div style="position: absolute; top: 20px; right: 20px; background: ${ui.badgeColor}; color: white; padding: 6px 14px; border-radius: 8px; font-weight: 800; font-size: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
-                   Score: ${ui.score}
+                   Score: ${Math.min(ui.score,100)}
                 </div>
-                
                 <div style="margin-bottom: 15px;">
                     <div style="font-size: 14px; color: #4b5563; font-weight: 600;">
                         Rent Estimate: <span style="color: #2563eb;">${d.rentZestimate ? '$'+d.rentZestimate+'/mo' : 'N/A'}</span>
@@ -311,7 +282,6 @@ async function startApp() {
                         Est. ROI: <span style="color: #10b981;">${d.calculatedROI.toFixed(2)}%</span>
                     </div>
                 </div>
-
                 <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 20px; align-items: center;">
                     <div>
                         <div style="font-size: 12px; font-weight: 800; color: #9ca3af; margin-bottom: 12px; text-transform: uppercase;">Safety</div>
@@ -339,54 +309,139 @@ async function startApp() {
     if(loader) loader.remove();
 }
 
-// --- PROPERTY PAGE INJECTION ---
+// --- PROPERTY PAGE LOGIC (DATA INJECTION) ---
+// --- PROPERTY PAGE LOGIC (DATA INJECTION) ---
 function startProperty() {
-    console.log("🏠 Starting Property Page Script...");
-    // 1. Target the Contact Form (More stable than the payment chip)
+    console.log("🏠 Property Page Detected");
     const selector = '[data-testid="home-details-chip-container"]';
 
     const injectPanel = () => {
         const targetBox = document.querySelector(selector);
-        
-        // Safety checks
-        if (!targetBox) {
-            console.log("⏳ Waiting for target...");
-            return; // Zillow hasn't rendered the form yet
-        }
-        if (document.getElementById("hello-world-extension")) return; // We already injected
+        if (!targetBox || document.getElementById("hello-world-extension")) return;
 
-        console.log("✅ Target found! Injecting panel...");
+        // 1. Get Data & Match Address
+        const allData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const currentAddress = document.querySelector('h1')?.innerText?.trim(); 
+        const normalizeAddr = (str) => str ? str.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : "";
+        const cleanCurrent = normalizeAddr(currentAddress);
+
+        const match = allData.find(item => {
+            const cleanItem = normalizeAddr(item.address);
+            return cleanCurrent.includes(cleanItem) || cleanItem.includes(cleanCurrent);
+        });
 
         const hello = document.createElement("div");
         hello.id = "hello-world-extension";
-        hello.innerHTML = `
-            <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">HELKOOdefjirfiri</div>
-            <div style="font-size: 14px; opacity: 0.9;">YEFDcrfr.</div>
-        `;
-        
         hello.style.cssText = `
-            display: block;
-            width: 100%;
-            padding: 20px;
-            margin-bottom: 20px;
-            background: #111827; 
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            position: relative;
-            z-index: 9999;
-            box-sizing: border-box;
+            display: block; width: 100%; padding: 25px; margin-bottom: 20px; 
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); font-family: -apple-system, sans-serif;
         `;
 
-        // Insert BEFORE the contact form container
+        // --- HELPER: SVG HALF-CIRCLE GAUGE ---
+        const makeGauge = (score, color, label, subtext) => {
+            const radius = 35;
+            const circumference = 2 * Math.PI * radius;
+            const offset = circumference - ((score / 100) * (circumference / 2)); // Only show half
+            
+            return `
+            <div style="display:flex; flex-direction:column; align-items:center; width: 100px;">
+                <div style="position: relative; width: 80px; height: 45px; overflow: hidden; margin-bottom: 5px;">
+                    <svg width="80" height="80" style="transform: rotate(-180deg);">
+                        <circle cx="40" cy="40" r="${radius}" fill="none" stroke="#f3f4f6" stroke-width="6" /> <circle cx="40" cy="40" r="${radius}" fill="none" stroke="${color}" stroke-width="6" 
+                                stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" 
+                                stroke-linecap="round" style="transition: stroke-dashoffset 1s ease-out;" />
+                    </svg>
+                    <div style="position: absolute; bottom: 0; width: 100%; text-align: center; font-size: 16px; font-weight: 800; color: #1f2937;">
+                        ${Math.round(score)}
+                    </div>
+                </div>
+                <div style="font-size: 11px; font-weight: 700; color: #4b5563; text-transform: uppercase;">${label}</div>
+                <div style="font-size: 10px; color: #9ca3af; text-align: center; line-height: 1.2; margin-top:2px;">${subtext}</div>
+            </div>`;
+        };
+
+        // --- HELPER: GENERATE INSIGHTS SENTENCES ---
+        const getVerdict = (d) => {
+            let pros = [];
+            let cons = [];
+            
+            if (d.calculatedROI > 6) pros.push(`High yield potential with an estimated <span style='color:#10b981; font-weight:bold;'>${d.calculatedROI.toFixed(1)}% ROI</span>.`);
+            else if (d.calculatedROI < 3) cons.push(`Low yield estimated at only ${d.calculatedROI.toFixed(1)}% ROI.`);
+
+            if (d.crime > 80) pros.push(`Located in a <span style='color:#10b981; font-weight:bold;'>very safe neighborhood</span> with low crime.`);
+            else if (d.crime < 50) cons.push(`Situated in a higher crime area which may impact long-term appreciation.`);
+
+            if (d.shop > 75 && d.cafe > 75) pros.push(`Excellent <span style='color:#3b82f6; font-weight:bold;'>walkability</span> to shops and cafes.`);
+            else if (d.shop < 40) cons.push(`Car-dependent area with few nearby amenities.`);
+
+            if (d.rentZestimate > d.purchasePrice * 0.007) pros.push("Strong rent-to-price ratio.");
+
+            // Combine into paragraphs
+            let html = "";
+            if (pros.length > 0) html += `<div style="margin-bottom:8px;"><b>Investment Worth:</b> ${pros.join(" ")}</div>`;
+            if (cons.length > 0) html += `<div>⚠️ <b>Risks to watch:</b> ${cons.join(" ")}</div>`;
+            
+            if (!html) html = "This property shows average metrics across the board. It is a stable but standard investment choice.";
+            
+            return html;
+        };
+
+        if (match) {
+            const d = match;
+            const scoreColor = d.finalScore >= 80 ? '#10b981' : (d.finalScore >= 60 ? '#f59e0b' : '#ef4444');
+
+            hello.innerHTML = `
+                <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 15px; margin-bottom: 20px;">
+                    <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 5px;">AI Investment Report</div>
+                    <div style="font-size: 13px; color: #6b7280;">Analysis based on rent, crime, and lifestyle data.</div>
+                </div>
+
+                <div style="display: flex; justify-content: space-around; align-items: flex-end; margin-bottom: 25px;">
+                    ${makeGauge(d.finalScore, scoreColor, "Investment", "Overall Score")}
+                    ${makeGauge(Math.min(d.calculatedROI * 10, 100), "#10b981", "Yield", `${d.calculatedROI.toFixed(2)}% ROI`)}
+                    ${makeGauge(d.crime, "#3b82f6", "Safety", "Crime Index")}
+                    ${makeGauge(d.shop, "#8b5cf6", "Convenience", "Walkability")}
+                </div>
+
+                <div style="background: #f9fafb; padding: 15px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #374151; border-left: 4px solid ${scoreColor};">
+                    ${getVerdict(d)}
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div>
+                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">Financials</div>
+                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Est. Rent:</span> <span style="font-weight: 700;">$${d.rentZestimate ? d.rentZestimate.toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div style="font-size: 13px; color: #4b5563; display: flex; justify-content: space-between;">
+                            <span>List Price:</span> <span style="font-weight: 700;">$${d.purchasePrice ? d.purchasePrice.toLocaleString() : 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; font-weight: 800; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">Location</div>
+                        <div style="font-size: 13px; color: #4b5563; margin-bottom: 4px;">• ${d.emprox > 80 ? 'Rapid EMS Response' : 'Avg EMS Response'}</div>
+                        <div style="font-size: 13px; color: #4b5563;">• ${d.envwell > 80 ? 'High Air Quality' : 'Avg Air Quality'}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            hello.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #6b7280;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">📉</div>
+                    <div style="font-weight: 600;">Data Not Found</div>
+                    <div style="font-size: 12px; margin-top: 5px;">Return to search results to generate a report for this property.</div>
+                    <div style="font-size: 10px; margin-top: 10px; opacity: 0.5;">${cleanCurrent}</div>
+                </div>
+            `;
+        }
+
         targetBox.parentNode.insertBefore(hello, targetBox);
     };
 
-    // Run immediately, then keep checking every 1s (fixes React re-renders)
     injectPanel();
     setInterval(injectPanel, 1000);
 }
-
 
 startApp();
 
