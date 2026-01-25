@@ -287,18 +287,49 @@ async function startApp() {
 }
 
 
-// --- PROPERTY PAGE LOGIC ---
 function startProperty() {
-    const selector = '[data-testid="contact-agent-form"]'; 
+    console.log("🏠 Starting Property Page Script...");
+    // 1. Target the Contact Form (More stable than the payment chip)
+    const selector = '[data-testid="home-details-chip-container"]';
+
     const injectPanel = () => {
         const targetBox = document.querySelector(selector);
-        if (!targetBox || document.getElementById("hello-world-extension")) return;
+        
+        // Safety checks
+        if (!targetBox) {
+            console.log("⏳ Waiting for target...");
+            return; // Zillow hasn't rendered the form yet
+        }
+        if (document.getElementById("hello-world-extension")) return; // We already injected
+
+        console.log("✅ Target found! Injecting panel...");
+
         const hello = document.createElement("div");
         hello.id = "hello-world-extension";
-        hello.innerHTML = `<div style="font-size: 18px; font-weight: 700;">AI Analysis</div><div>Ready.</div>`;
-        hello.style.cssText = `padding: 20px; margin-bottom: 20px; background: #111827; color: white; border-radius: 8px;`;
+        hello.innerHTML = `
+            <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">HELKOOdefjirfiri</div>
+            <div style="font-size: 14px; opacity: 0.9;">YEFDcrfr.</div>
+        `;
+        
+        hello.style.cssText = `
+            display: block;
+            width: 100%;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #111827; 
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 9999;
+            box-sizing: border-box;
+        `;
+
+        // Insert BEFORE the contact form container
         targetBox.parentNode.insertBefore(hello, targetBox);
     };
+
+    // Run immediately, then keep checking every 1s (fixes React re-renders)
     injectPanel();
     setInterval(injectPanel, 1000);
 }
