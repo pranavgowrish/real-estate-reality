@@ -1,5 +1,4 @@
 def greet(name):
-    # Modified the greeting message differently
-    print(f"Greetings, {name}. Welcome to the system.")
+    print(f", {name}. Welcome to the system.")
 
 greet("Developer")
